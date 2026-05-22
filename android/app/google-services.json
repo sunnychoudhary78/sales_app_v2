@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "672339294776",
+    "project_id": "salesvisitpro",
+    "storage_bucket": "salesvisitpro.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:672339294776:android:5facb51e2b1ec572b3c4cd",
+        "android_client_info": {
+          "package_name": "com.example.salesvisitpro_mob_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDuWxEAwNDiWqT3zyuPTFdxhisjOvDtiLc"
+        },
+        {
+          "current_key": "AIzaSyDKFSi-5Mv0wLxPbUaZHmN4Q2Vy4Tlb15I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:672339294776:android:067ce89085dbc560b3c4cd",
+        "android_client_info": {
+          "package_name": "com.imt.sales_visit_pro"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDuWxEAwNDiWqT3zyuPTFdxhisjOvDtiLc"
+        },
+        {
+          "current_key": "AIzaSyDKFSi-5Mv0wLxPbUaZHmN4Q2Vy4Tlb15I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
