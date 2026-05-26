@@ -112,7 +112,7 @@ class LoginGlassAuthShell extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'SELLORA',
+                    'IMT-Tracking',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
