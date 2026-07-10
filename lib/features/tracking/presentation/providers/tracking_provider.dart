@@ -64,6 +64,8 @@ class TrackingNotifier extends Notifier<TrackingState> {
     final repo = ref.read(trackingRepositoryProvider);
     final auth = ref.read(authProvider);
     final userId = auth.profile?.userId ?? auth.rawUser?['id']?.toString();
+
+    await repo.reconcileLocalSessionWithServer(userId);
     await repo.tryRestoreActiveSessionFromServer(userId);
 
     final sessionId = await repo.getStoredSessionId();
@@ -75,6 +77,7 @@ class TrackingNotifier extends Notifier<TrackingState> {
       await repo.ensureBackgroundTrackingRunning();
       _startTimer();
     } else {
+      _checkInTime = null;
       _stopTimer();
       state = state.copyWith(durationText: '00:00:00');
     }
@@ -104,9 +107,13 @@ class TrackingNotifier extends Notifier<TrackingState> {
     state = state.copyWith(isLoading: true);
     try {
       await ref.read(trackingRepositoryProvider).checkOut();
+      _checkInTime = null;
       state = state.copyWith(isTracking: false, durationText: '00:00:00');
       _stopTimer();
       await fetchHistory();
+    } catch (_) {
+      // Checkout may have succeeded server-side while local sync hung.
+      await refreshStatus();
     } finally {
       state = state.copyWith(isLoading: false);
     }

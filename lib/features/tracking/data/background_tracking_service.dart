@@ -13,10 +13,29 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/device/battery_level.dart';
 import '../../../core/network/api_constants.dart';
 import '../../../core/storage/storage_keys.dart';
 import 'models/location_point.dart';
 import 'tracking_db_service.dart';
+
+/// GPS fixes worse than 55m accuracy are not recorded (matches API batch ingest).
+const double _kMaxRecordAccuracyM = 55;
+
+/// Force a GPS fix when no point was written for this long.
+const int _kGpsFallbackSec = 90;
+
+/// Restart position stream when stale this long (service alive but stream stalled).
+const int _kStreamRestartSec = 180;
+
+/// Restart background service from app process when last point is older than this.
+const int _kAppRestartStaleSec = 180;
+
+/// Silent channel id — new id so existing installs are not stuck with old sound settings.
+const String _kTrackingNotificationChannelId = 'sales_tracking_location_silent';
+
+/// Minimum interval between foreground notification text updates (avoids alert sounds).
+const int _kNotificationUpdateMinSec = 60;
 
 class BackgroundTrackingService {
   const BackgroundTrackingService();
@@ -55,13 +74,29 @@ class BackgroundTrackingService {
     return true;
   }
 
+  /// Best-effort; check-in proceeds even if the user declines.
+  Future<bool> ensureBatteryOptimizationExemption() async {
+    if (!Platform.isAndroid) return true;
+    final status = await Permission.ignoreBatteryOptimizations.status;
+    if (status.isGranted) return true;
+    final result = await Permission.ignoreBatteryOptimizations.request();
+    return result.isGranted;
+  }
+
+  Future<bool> isBatteryOptimizationIgnored() async {
+    if (!Platform.isAndroid) return true;
+    return (await Permission.ignoreBatteryOptimizations.status).isGranted;
+  }
+
   Future<void> initialize() async {
     final service = FlutterBackgroundService();
     const channel = AndroidNotificationChannel(
-      'sales_tracking_location',
+      _kTrackingNotificationChannelId,
       'Sales tracking location',
       description: 'Keeps route tracking active during field visits.',
       importance: Importance.low,
+      playSound: false,
+      enableVibration: false,
     );
 
     final notifications = FlutterLocalNotificationsPlugin();
@@ -84,7 +119,7 @@ class BackgroundTrackingService {
         onStart: trackingServiceEntryPoint,
         autoStart: false,
         isForegroundMode: true,
-        notificationChannelId: 'sales_tracking_location',
+        notificationChannelId: _kTrackingNotificationChannelId,
         initialNotificationTitle: 'Sales tracking active',
         initialNotificationContent: 'Recording your GPS route',
         foregroundServiceNotificationId: 889,
@@ -105,19 +140,60 @@ class BackgroundTrackingService {
     }
   }
 
+  /// Restarts the background service when a session is open but GPS is stale.
+  Future<void> ensureTrackingIfSessionActive() async {
+    final prefs = await SharedPreferences.getInstance();
+    final sessionId = prefs.getString(StorageKeys.trackingSessionId);
+    if (sessionId == null || sessionId.isEmpty) return;
+
+    final staleSec = await _lastPointAgeSeconds(prefs);
+    final service = FlutterBackgroundService();
+    final running = await service.isRunning();
+
+    if (!running || staleSec >= _kAppRestartStaleSec) {
+      debugPrint(
+        'Tracking restart: running=$running staleSec=$staleSec session=$sessionId',
+      );
+      await startTracking();
+    }
+  }
+
+  Future<int> _lastPointAgeSeconds(SharedPreferences prefs) async {
+    final raw = prefs.getString(StorageKeys.trackingLastPointAt);
+    final last = raw != null ? DateTime.tryParse(raw)?.toUtc() : null;
+    if (last == null) return 9999;
+    return DateTime.now().toUtc().difference(last).inSeconds;
+  }
+
   Future<void> stopTracking({String? overrideSessionId}) async {
     await syncAllPendingOnce(overrideSessionId: overrideSessionId);
+    await stopServiceOnly();
+  }
+
+  Future<void> stopServiceOnly() async {
     final service = FlutterBackgroundService();
     if (await service.isRunning()) {
       service.invoke('stopService');
     }
   }
 
-  Future<void> syncAllPendingOnce({String? overrideSessionId}) async {
-    await _syncPoints(
+  Future<void> syncAllPendingOnce({
+    String? overrideSessionId,
+    Duration? maxDuration,
+  }) async {
+    final sync = _syncPoints(
       TrackingDbService.instance,
       overrideSessionId: overrideSessionId,
     );
+    if (maxDuration == null) {
+      await sync;
+      return;
+    }
+    try {
+      await sync.timeout(maxDuration);
+    } on TimeoutException {
+      debugPrint('Tracking sync timed out after ${maxDuration.inSeconds}s');
+    }
   }
 }
 
@@ -144,26 +220,151 @@ void trackingServiceEntryPoint(ServiceInstance service) async {
   await db.database;
 
   Timer? syncTimer;
+  Timer? gpsWatchdogTimer;
   StreamSubscription<Position>? positionSub;
   DateTime? lastWrittenAt;
   String? locationOffReportedSessionId;
   bool locationOffReported = false;
+  DateTime? lastNotificationUpdateAt;
 
-  Future<void> stop() async {
-    syncTimer?.cancel();
-    await positionSub?.cancel();
-    service.stopSelf();
+  final androidService = service is AndroidServiceInstance ? service : null;
+
+  Future<void> persistLastWrittenAt(DateTime at) async {
+    lastWrittenAt = at;
+    await prefs.setString(StorageKeys.trackingLastPointAt, at.toIso8601String());
   }
 
-  if (service is AndroidServiceInstance) {
-    service.setAsForegroundService();
+  DateTime? readPersistedLastWrittenAt() {
+    final raw = prefs.getString(StorageKeys.trackingLastPointAt);
+    return raw != null ? DateTime.tryParse(raw)?.toUtc() : null;
   }
 
-  service.on('stopService').listen((event) async {
-    await stop();
-  });
+  lastWrittenAt = readPersistedLastWrittenAt();
 
-  final settings = Platform.isAndroid
+  Future<void> updateTrackingNotification() async {
+    final android = androidService;
+    if (android == null) return;
+    if (!await android.isForegroundService()) return;
+
+    final now = DateTime.now().toUtc();
+    if (lastNotificationUpdateAt != null &&
+        now.difference(lastNotificationUpdateAt!).inSeconds <
+            _kNotificationUpdateMinSec) {
+      return;
+    }
+
+    final unsynced = (await db.getUnsyncedPoints()).length;
+    final last = lastWrittenAt ?? readPersistedLastWrittenAt();
+    final ageSec = last == null
+        ? -1
+        : DateTime.now().toUtc().difference(last).inSeconds;
+
+    String ageLabel;
+    if (ageSec < 0) {
+      ageLabel = 'waiting for GPS';
+    } else if (ageSec < 60) {
+      ageLabel = '${ageSec}s ago';
+    } else {
+      ageLabel = '${(ageSec / 60).floor()}m ago';
+    }
+
+    final pending = unsynced > 0 ? ' • $unsynced pending' : '';
+    final warn = ageSec >= 300 ? ' — GPS may be paused' : '';
+
+    android.setForegroundNotificationInfo(
+      title: 'Sales tracking active',
+      content: 'Last GPS: $ageLabel$pending$warn',
+    );
+    lastNotificationUpdateAt = now;
+  }
+
+  Future<bool> tryRecordPosition(Position position) async {
+    final sessionId = prefs.getString(StorageKeys.trackingSessionId);
+    if (sessionId == null || sessionId.isEmpty) return false;
+    if (!position.latitude.isFinite || !position.longitude.isFinite) {
+      return false;
+    }
+    if (!position.accuracy.isFinite ||
+        position.accuracy > _kMaxRecordAccuracyM) {
+      return false;
+    }
+
+    final now = position.timestamp.toUtc();
+    final last = await db.getLastPoint();
+    if (last != null) {
+      final dist = _distanceMeters(
+        last.latitude,
+        last.longitude,
+        position.latitude,
+        position.longitude,
+      );
+      final lastAt = DateTime.tryParse(last.recordedAt)?.toUtc();
+      final gapSec =
+          lastAt == null ? 9999 : now.difference(lastAt).inSeconds;
+      if (dist < 5 && gapSec < 75) return false;
+      if (gapSec > 0 && gapSec <= 10 && dist > 200) return false;
+    }
+
+    final bearing = last == null
+        ? position.heading
+        : _bearingDegrees(
+            last.latitude,
+            last.longitude,
+            position.latitude,
+            position.longitude,
+          );
+    final batteryPercent = await readBatteryPercent();
+    await db.insertPoint(
+      LocationPoint(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracy: position.accuracy,
+        speed: position.speed.isFinite ? position.speed : null,
+        heading: bearing.isFinite ? bearing : null,
+        batteryPercent: batteryPercent,
+        recordedAt: now.toIso8601String(),
+      ),
+    );
+    await prefs.setString(
+      StorageKeys.lastLatitude,
+      position.latitude.toString(),
+    );
+    await prefs.setString(
+      StorageKeys.lastLongitude,
+      position.longitude.toString(),
+    );
+    await persistLastWrittenAt(now);
+    return true;
+  }
+
+  Future<void> forceGpsFallback({required bool allowStationary}) async {
+    try {
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.bestForNavigation,
+          timeLimit: Duration(seconds: 12),
+        ),
+      );
+      if (!pos.accuracy.isFinite || pos.accuracy > _kMaxRecordAccuracyM) {
+        return;
+      }
+      final last = await db.getLastPoint();
+      final dist = last == null
+          ? 9999.0
+          : _distanceMeters(
+              last.latitude,
+              last.longitude,
+              pos.latitude,
+              pos.longitude,
+            );
+      if (!allowStationary && dist < 5) return;
+      await tryRecordPosition(pos);
+    } catch (e) {
+      debugPrint('GPS fallback failed: $e');
+    }
+  }
+
+  final locationSettings = Platform.isAndroid
       ? AndroidSettings(
           accuracy: LocationAccuracy.bestForNavigation,
           distanceFilter: 5,
@@ -178,71 +379,69 @@ void trackingServiceEntryPoint(ServiceInstance service) async {
           showBackgroundLocationIndicator: true,
         );
 
-  positionSub = Geolocator.getPositionStream(locationSettings: settings).listen((
-    position,
-  ) async {
+  Future<void> stopTrackingService() async {
+    syncTimer?.cancel();
+    gpsWatchdogTimer?.cancel();
+    await positionSub?.cancel();
+    service.stopSelf();
+  }
+
+  void startPositionStream() {
+    positionSub?.cancel();
+    positionSub = Geolocator.getPositionStream(
+      locationSettings: locationSettings,
+    ).listen((position) async {
+      try {
+        final sessionId = prefs.getString(StorageKeys.trackingSessionId);
+        if (sessionId == null || sessionId.isEmpty) {
+          await stopTrackingService();
+          return;
+        }
+        await tryRecordPosition(position);
+      } catch (e) {
+        debugPrint('Tracking point write failed: $e');
+      }
+    });
+  }
+
+  if (androidService != null) {
+    androidService.setAsForegroundService();
+  }
+
+  service.on('stopService').listen((event) async {
+    await stopTrackingService();
+  });
+
+  startPositionStream();
+  unawaited(updateTrackingNotification());
+
+  gpsWatchdogTimer = Timer.periodic(const Duration(seconds: 60), (_) async {
     try {
       final sessionId = prefs.getString(StorageKeys.trackingSessionId);
       if (sessionId == null || sessionId.isEmpty) {
-        await stop();
+        await stopTrackingService();
         return;
       }
-      if (!position.latitude.isFinite || !position.longitude.isFinite) return;
-      if (!position.accuracy.isFinite || position.accuracy > 55) return;
 
-      final now = position.timestamp.toUtc();
-      final last = await db.getLastPoint();
-      if (last != null) {
-        final dist = _distanceMeters(
-          last.latitude,
-          last.longitude,
-          position.latitude,
-          position.longitude,
-        );
-        final lastAt = DateTime.tryParse(last.recordedAt)?.toUtc();
-        final gapSec = lastAt == null ? 9999 : now.difference(lastAt).inSeconds;
-        if (dist < 5 && gapSec < 75) return;
-        if (gapSec > 0 && gapSec <= 10 && dist > 200) return;
+      final persisted = readPersistedLastWrittenAt();
+      if (persisted != null) {
+        lastWrittenAt = persisted;
+      }
+      final gap = lastWrittenAt == null
+          ? 9999
+          : DateTime.now().toUtc().difference(lastWrittenAt!).inSeconds;
+
+      if (gap >= _kGpsFallbackSec) {
+        await forceGpsFallback(allowStationary: gap >= _kGpsFallbackSec);
+      }
+      if (gap >= _kStreamRestartSec) {
+        debugPrint('Restarting GPS position stream after ${gap}s gap');
+        startPositionStream();
       }
 
-      final bearing = last == null
-          ? position.heading
-          : _bearingDegrees(
-              last.latitude,
-              last.longitude,
-              position.latitude,
-              position.longitude,
-            );
-      await db.insertPoint(
-        LocationPoint(
-          latitude: position.latitude,
-          longitude: position.longitude,
-          accuracy: position.accuracy,
-          speed: position.speed.isFinite ? position.speed : null,
-          heading: bearing.isFinite ? bearing : null,
-          recordedAt: now.toIso8601String(),
-        ),
-      );
-      await prefs.setString(
-        StorageKeys.lastLatitude,
-        position.latitude.toString(),
-      );
-      await prefs.setString(
-        StorageKeys.lastLongitude,
-        position.longitude.toString(),
-      );
-      lastWrittenAt = now;
-
-      if (service is AndroidServiceInstance &&
-          await service.isForegroundService()) {
-        service.setForegroundNotificationInfo(
-          title: 'Sales tracking active',
-          content:
-              'GPS ${position.latitude.toStringAsFixed(5)}, ${position.longitude.toStringAsFixed(5)}',
-        );
-      }
+      await updateTrackingNotification();
     } catch (e) {
-      debugPrint('Tracking point write failed: $e');
+      debugPrint('GPS watchdog failed: $e');
     }
   });
 
@@ -250,7 +449,7 @@ void trackingServiceEntryPoint(ServiceInstance service) async {
     try {
       final sessionId = prefs.getString(StorageKeys.trackingSessionId);
       if (sessionId == null || sessionId.isEmpty) {
-        await stop();
+        await stopTrackingService();
         return;
       }
 
@@ -291,58 +490,26 @@ void trackingServiceEntryPoint(ServiceInstance service) async {
       } catch (_) {}
 
       await _sendHeartbeat(sessionId);
-
-      final gap = lastWrittenAt == null
-          ? 0
-          : DateTime.now().toUtc().difference(lastWrittenAt!).inSeconds;
-      if (gap >= 90) {
-        try {
-          final pos = await Geolocator.getCurrentPosition(
-            locationSettings: const LocationSettings(
-              accuracy: LocationAccuracy.bestForNavigation,
-              timeLimit: Duration(seconds: 12),
-            ),
-          );
-          if (pos.accuracy.isFinite && pos.accuracy <= 55) {
-            final last = await db.getLastPoint();
-            final dist = last == null
-                ? 9999.0
-                : _distanceMeters(
-                    last.latitude,
-                    last.longitude,
-                    pos.latitude,
-                    pos.longitude,
-                  );
-            if (dist >= 5) {
-              await db.insertPoint(
-                LocationPoint(
-                  latitude: pos.latitude,
-                  longitude: pos.longitude,
-                  accuracy: pos.accuracy,
-                  speed: pos.speed.isFinite ? pos.speed : null,
-                  heading: pos.heading.isFinite ? pos.heading : null,
-                  recordedAt: pos.timestamp.toUtc().toIso8601String(),
-                ),
-              );
-              lastWrittenAt = pos.timestamp.toUtc();
-            }
-          }
-        } catch (_) {}
-      }
-
       await _syncPoints(db);
+      await updateTrackingNotification();
     } catch (_) {}
   });
 }
 
 bool _syncRunning = false;
+Completer<void>? _syncCompleter;
 
 Future<void> _syncPoints(
   TrackingDbService db, {
   String? overrideSessionId,
 }) async {
-  if (_syncRunning) return;
+  if (_syncRunning) {
+    final pending = _syncCompleter?.future;
+    if (pending != null) await pending;
+    return;
+  }
   _syncRunning = true;
+  _syncCompleter = Completer<void>();
   try {
     final points = await db.getUnsyncedPoints();
     if (points.isEmpty) return;
@@ -390,6 +557,8 @@ Future<void> _syncPoints(
                 'accuracy': p.accuracy,
                 'speed': p.speed,
                 'heading': p.heading,
+                if (p.batteryPercent != null)
+                  'battery_percent': p.batteryPercent,
                 'is_offline': true,
               },
           ],
@@ -405,6 +574,11 @@ Future<void> _syncPoints(
     debugPrint('Tracking sync failed: $e');
   } finally {
     _syncRunning = false;
+    final completer = _syncCompleter;
+    _syncCompleter = null;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
+    }
   }
 }
 

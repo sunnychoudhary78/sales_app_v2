@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +19,21 @@ import '../../../../shared/widgets/premium_shell.dart';
 import '../../../../shared/widgets/screen_accent_backdrop.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/visits_providers.dart';
+
+String _visitSaveErrorMessage(Object error) {
+  if (error is DioException) {
+    final data = error.response?.data;
+    if (data is Map && data['message'] != null) {
+      return data['message'].toString();
+    }
+    final status = error.response?.statusCode;
+    if (status != null) {
+      return 'Request failed (HTTP $status). Please try again.';
+    }
+    return 'Network error. Check your connection and try again.';
+  }
+  return error.toString();
+}
 
 const _indianStates = <String>[
   'Andhra Pradesh',
@@ -722,7 +738,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save visit: $e')),
+        SnackBar(content: Text('Failed to save visit: ${_visitSaveErrorMessage(e)}')),
       );
     } finally {
       if (mounted) setState(() => _saving = false);

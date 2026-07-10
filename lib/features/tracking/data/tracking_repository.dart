@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/network_providers.dart';
@@ -14,10 +16,14 @@ class TrackingRepository {
 
   TrackingRepository(this._api, this._userStorage, this._backgroundTracking);
 
+  static const _preCheckoutSyncMax = Duration(seconds: 20);
+
   Future<bool> checkIn() async {
     final hasPermission = await _backgroundTracking
         .ensureLocationServiceAndPermissions();
     if (!hasPermission) return false;
+
+    await _backgroundTracking.ensureBatteryOptimizationExemption();
 
     final sessionId = await _api.checkIn();
     if (sessionId != null && sessionId.isNotEmpty) {
@@ -34,17 +40,31 @@ class TrackingRepository {
 
   Future<void> checkOut() async {
     final sessionId = await getStoredSessionId();
-    await _backgroundTracking.syncAllPendingOnce(overrideSessionId: sessionId);
+
+    // Best-effort upload before close; do not block checkout indefinitely.
+    await _backgroundTracking.syncAllPendingOnce(
+      overrideSessionId: sessionId,
+      maxDuration: _preCheckoutSyncMax,
+    );
+
     await _api.checkOut();
-    await _backgroundTracking.stopTracking(overrideSessionId: sessionId);
-    await _userStorage.remove(StorageKeys.trackingSessionId);
-    await _userStorage.remove(StorageKeys.checkInTime);
-    await _userStorage.remove(StorageKeys.lastLatitude);
-    await _userStorage.remove(StorageKeys.lastLongitude);
+
+    // Drop local session immediately so UI and background GPS stop using stale state.
+    await clearLocalSession();
+    await _backgroundTracking.stopServiceOnly();
+
+    if (sessionId != null && sessionId.isNotEmpty) {
+      unawaited(
+        _backgroundTracking.syncAllPendingOnce(
+          overrideSessionId: sessionId,
+          maxDuration: const Duration(seconds: 45),
+        ),
+      );
+    }
   }
 
   Future<void> ensureBackgroundTrackingRunning() {
-    return _backgroundTracking.startTracking();
+    return _backgroundTracking.ensureTrackingIfSessionActive();
   }
 
   Future<List<TrackingSessionModel>> fetchHistory({int limit = 50}) async {
@@ -59,12 +79,46 @@ class TrackingRepository {
     return (track: track, visits: visits);
   }
 
+  /// Aligns local prefs with server: clears stale "checked in" cache when the
+  /// API has no open session (e.g. checkout succeeded on web/another device).
+  Future<void> reconcileLocalSessionWithServer(String? currentUserId) async {
+    final open = await _findOpenSessionRow(currentUserId);
+    if (open == null) {
+      final local = await getStoredSessionId();
+      if (local != null && local.isNotEmpty) {
+        await clearLocalSession();
+        await _backgroundTracking.stopServiceOnly();
+      }
+      return;
+    }
+
+    final sessionId = (open['id'] ?? open['session_id'] ?? open['sessionId'])
+        ?.toString();
+    if (sessionId == null || sessionId.isEmpty) return;
+
+    final checkInStr = (open['check_in_at'] ?? open['checkInAt'])?.toString();
+    await _userStorage.saveValue(StorageKeys.trackingSessionId, sessionId);
+    final parsed = checkInStr != null ? DateTime.tryParse(checkInStr) : null;
+    await _userStorage.saveValue(
+      StorageKeys.checkInTime,
+      (parsed ?? DateTime.now()).toIso8601String(),
+    );
+  }
+
   /// When local storage lost session (e.g. reinstall) but server still has an open session.
   Future<bool> tryRestoreActiveSessionFromServer(String? currentUserId) async {
     final existing = await getStoredSessionId();
     if (existing != null && existing.isNotEmpty) return false;
 
-    final rows = await _api.fetchHistory(limit: 5);
+    final open = await _findOpenSessionRow(currentUserId);
+    if (open == null) return false;
+
+    await reconcileLocalSessionWithServer(currentUserId);
+    return true;
+  }
+
+  Future<Map<String, dynamic>?> _findOpenSessionRow(String? currentUserId) async {
+    final rows = await _api.fetchHistory(limit: 10);
     for (final raw in rows) {
       if (currentUserId != null && currentUserId.isNotEmpty) {
         final itemUserId =
@@ -81,20 +135,17 @@ class TrackingRepository {
       if (status != 'open' && status != 'active' && status != 'running') {
         continue;
       }
-      final sessionId = (raw['id'] ?? raw['session_id'] ?? raw['sessionId'])
-          ?.toString();
-      final checkInStr = (raw['check_in_at'] ?? raw['checkInAt'])?.toString();
-      if (sessionId != null && sessionId.isNotEmpty) {
-        await _userStorage.saveValue(StorageKeys.trackingSessionId, sessionId);
-      }
-      final parsed = checkInStr != null ? DateTime.tryParse(checkInStr) : null;
-      await _userStorage.saveValue(
-        StorageKeys.checkInTime,
-        (parsed ?? DateTime.now()).toIso8601String(),
-      );
-      return true;
+      return raw;
     }
-    return false;
+    return null;
+  }
+
+  Future<void> clearLocalSession() async {
+    await _userStorage.remove(StorageKeys.trackingSessionId);
+    await _userStorage.remove(StorageKeys.checkInTime);
+    await _userStorage.remove(StorageKeys.lastLatitude);
+    await _userStorage.remove(StorageKeys.lastLongitude);
+    await _userStorage.remove(StorageKeys.trackingLastPointAt);
   }
 
   Future<String?> getStoredSessionId() {

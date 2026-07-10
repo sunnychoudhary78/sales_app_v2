@@ -10,3 +10,8 @@ final managerClaimRequestsProvider = FutureProvider<List<Map<String, dynamic>>>(
   return ref.read(claimsRepositoryProvider).fetchManagerRequests();
 });
 
+final myClaimDistanceHistoryProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  return ref.read(claimsRepositoryProvider).fetchMyDistanceHistory(months: 12);
+});
+

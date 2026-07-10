@@ -21,10 +21,16 @@ class HomeTrackingDashboardHero extends StatelessWidget {
     super.key,
     required this.performance,
     required this.displayName,
+    this.showLiveBadge = true,
+    this.displayRangeStart,
+    this.displayRangeEnd,
   });
 
   final HomePerformanceData performance;
   final String displayName;
+  final bool showLiveBadge;
+  final DateTime? displayRangeStart;
+  final DateTime? displayRangeEnd;
 
   static String _formatKmValue(double v) {
     if (v >= 100) return v.toStringAsFixed(0);
@@ -32,14 +38,44 @@ class HomeTrackingDashboardHero extends StatelessWidget {
     return v.toStringAsFixed(2);
   }
 
-  static String _periodLabel(String fromIso, String toIso) {
-    final a = DateTime.tryParse(fromIso)?.toLocal();
-    final b = DateTime.tryParse(toIso)?.toLocal();
-    if (a == null || b == null) return 'This month';
+  static DateTime? _calendarDateFromIso(String iso) {
+    final s = iso.trim();
+    if (s.isEmpty) return null;
+    final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})').firstMatch(s);
+    if (match != null) {
+      final y = int.tryParse(match.group(1)!);
+      final m = int.tryParse(match.group(2)!);
+      final d = int.tryParse(match.group(3)!);
+      if (y != null && m != null && d != null) {
+        return DateTime(y, m, d);
+      }
+    }
+    return DateTime.tryParse(s)?.toLocal();
+  }
+
+  static String _periodLabelFromLocal(DateTime start, DateTime end) {
+    final a = DateTime(start.year, start.month, start.day);
+    final b = DateTime(end.year, end.month, end.day);
     if (a.year == b.year && a.month == b.month) {
       return '${DateFormat('d').format(a)} – ${DateFormat('d MMM yyyy').format(b)}';
     }
     return '${DateFormat('d MMM').format(a)} – ${DateFormat('d MMM yyyy').format(b)}';
+  }
+
+  static String _periodLabel(String fromIso, String toIso) {
+    final a = _calendarDateFromIso(fromIso);
+    final b = _calendarDateFromIso(toIso);
+    if (a == null || b == null) return 'This month';
+    return _periodLabelFromLocal(a, b);
+  }
+
+  String _resolvePeriodLabel() {
+    final start = displayRangeStart;
+    final end = displayRangeEnd;
+    if (start != null && end != null) {
+      return _periodLabelFromLocal(start, end);
+    }
+    return _periodLabel(performance.rangeFromIso, performance.rangeToIso);
   }
 
   static String _firstName(String full) {
@@ -119,7 +155,7 @@ class HomeTrackingDashboardHero extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _periodLabel(performance.rangeFromIso, performance.rangeToIso),
+                            _resolvePeriodLabel(),
                             style: GoogleFonts.inter(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w600,
@@ -130,30 +166,49 @@ class HomeTrackingDashboardHero extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: _RouteAccent.live.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(999),
-                        border: Border.all(color: _RouteAccent.live.withValues(alpha: 0.35)),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.verified_rounded, size: 16, color: _RouteAccent.live),
-                          const SizedBox(width: 5),
-                          Text(
-                            'Live',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w800,
-                              color: _RouteAccent.live,
-                              letterSpacing: 0.2,
+                    if (showLiveBadge)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: _RouteAccent.live.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: _RouteAccent.live.withValues(alpha: 0.35)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.verified_rounded, size: 16, color: _RouteAccent.live),
+                            const SizedBox(width: 5),
+                            Text(
+                              'Live',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                color: _RouteAccent.live,
+                                letterSpacing: 0.2,
+                              ),
                             ),
+                          ],
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: scheme.surfaceContainerHighest.withValues(alpha: 0.9),
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: border),
+                        ),
+                        child: Text(
+                          'Past month',
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: scheme.onSurfaceVariant,
+                            letterSpacing: 0.2,
                           ),
-                        ],
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),

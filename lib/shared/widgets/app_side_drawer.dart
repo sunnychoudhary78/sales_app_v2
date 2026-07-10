@@ -6,15 +6,10 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/providers/user_data_invalidation.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
+import 'organization_line.dart';
 import '../../shared/utils/avatar_url_utils.dart';
 import '../../shared/widgets/profile_avatar_image.dart';
 import '../utils/permission_utils.dart';
-
-String _drawerFirstName(String full) {
-  final t = full.trim();
-  if (t.isEmpty) return 'there';
-  return t.split(RegExp(r'\s+')).first;
-}
 
 class AppSideDrawer extends ConsumerWidget {
   const AppSideDrawer({super.key});
@@ -23,6 +18,7 @@ class AppSideDrawer extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
     final user = auth.rawUser;
+    final companyCtx = ref.watch(companyContextProvider);
     final roleObj = user == null ? null : user['role'];
     final roleName = ((roleObj is Map ? roleObj['name'] : user?['role_name'])
             ?.toString() ??
@@ -105,7 +101,8 @@ class AppSideDrawer extends ConsumerWidget {
     ];
 
     final displayName = (user?['name'] ?? auth.profile?.name ?? 'User').toString();
-    final employeeId = (user?['employee_id'] ?? user?['id'] ?? '-').toString();
+    final designation = (user?['designation_name'] ?? '').toString().trim();
+    final employeeCode = (user?['employee_id'] ?? '').toString().trim();
 
     final scheme = Theme.of(context).colorScheme;
     final mq = MediaQuery.sizeOf(context);
@@ -124,8 +121,12 @@ class AppSideDrawer extends ConsumerWidget {
           children: [
             _SalesDrawerHeader(
               displayName: displayName,
-              employeeId: employeeId,
-              roleLabel: roleName.isEmpty ? 'Field user' : roleName,
+              designation: designation.isEmpty ? null : designation,
+              companyLine: companyCtx.displayCompanyName.isNotEmpty
+                  ? companyCtx.displayCompanyName
+                  : null,
+              isSubCompany: companyCtx.isSubCompany,
+              employeeCode: employeeCode.isEmpty ? null : employeeCode,
               avatarUrls: resolveAvatarUrlCandidates(user),
               avatarVersion: resolveAvatarUrl(user) ?? '',
             ),
@@ -243,15 +244,19 @@ class _DrawerEntry {
 class _SalesDrawerHeader extends StatelessWidget {
   const _SalesDrawerHeader({
     required this.displayName,
-    required this.employeeId,
-    required this.roleLabel,
     required this.avatarUrls,
+    this.designation,
+    this.companyLine,
+    this.isSubCompany = false,
+    this.employeeCode,
     this.avatarVersion = '',
   });
 
   final String displayName;
-  final String employeeId;
-  final String roleLabel;
+  final String? designation;
+  final String? companyLine;
+  final bool isSubCompany;
+  final String? employeeCode;
   final List<String> avatarUrls;
   /// Bust image cache when [profile_picture] changes (may reuse same path).
   final String avatarVersion;
@@ -260,10 +265,8 @@ class _SalesDrawerHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final trimmed = displayName.trim();
-    final initial = trimmed.isEmpty ? 'U' : trimmed.substring(0, 1).toUpperCase();
-    final first = _drawerFirstName(displayName);
-    final parts = trimmed.split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
-    final showFullLine = parts.length > 1;
+    final name = trimmed.isEmpty ? 'User' : trimmed;
+    final initial = name.substring(0, 1).toUpperCase();
 
     final deep = Color.lerp(scheme.primary, const Color(0xFF0A0A0A), 0.14) ?? scheme.primary;
     final lift = Color.lerp(scheme.primary, scheme.tertiary, 0.22) ?? scheme.primary;
@@ -304,69 +307,95 @@ class _SalesDrawerHeader extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    children: [
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: scheme.tertiary,
+                          boxShadow: [
+                            BoxShadow(
+                              color: scheme.tertiary.withValues(alpha: 0.5),
+                              blurRadius: 10,
+                              spreadRadius: 0.5,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'LIVE OPS',
+                        style: GoogleFonts.inter(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.35,
+                          color: scheme.onPrimary.withValues(alpha: 0.82),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: scheme.tertiary,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: scheme.tertiary.withValues(alpha: 0.5),
-                                        blurRadius: 10,
-                                        spreadRadius: 0.5,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  'LIVE OPS',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 1.35,
-                                    color: scheme.onPrimary.withValues(alpha: 0.82),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
                             Text(
-                              'Hi, $first',
+                              name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.inter(
-                                fontSize: 26,
+                                fontSize: 22,
                                 fontWeight: FontWeight.w800,
-                                letterSpacing: -0.85,
-                                height: 1.05,
+                                letterSpacing: -0.65,
+                                height: 1.15,
                                 color: scheme.onPrimary,
                               ),
                             ),
-                            if (showFullLine) ...[
-                              const SizedBox(height: 5),
+                            if (designation != null) ...[
+                              const SizedBox(height: 6),
                               Text(
-                                trimmed,
-                                maxLines: 1,
+                                designation!,
+                                maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.inter(
                                   fontSize: 13,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w500,
+                                  height: 1.35,
                                   color: scheme.onPrimary.withValues(alpha: 0.78),
+                                ),
+                              ),
+                            ],
+                            if (companyLine != null && companyLine!.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              OrganizationLine(
+                                companyName: companyLine!,
+                                isSubCompany: isSubCompany,
+                                textColor: scheme.onPrimary.withValues(alpha: 0.7),
+                                fontSize: 12,
+                              ),
+                            ],
+                            if (employeeCode != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Code: $employeeCode',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  height: 1.35,
+                                  color: scheme.onPrimary.withValues(alpha: 0.65),
                                 ),
                               ),
                             ],
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 12),
                       DecoratedBox(
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
@@ -392,26 +421,6 @@ class _SalesDrawerHeader extends StatelessWidget {
                               initial: initial,
                             ),
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _OpsStripTag(
-                          icon: Icons.work_outline_rounded,
-                          text: roleLabel,
-                          scheme: scheme,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _OpsStripTag(
-                          icon: Icons.tag_rounded,
-                          text: 'ID $employeeId',
-                          scheme: scheme,
                         ),
                       ),
                     ],
@@ -486,51 +495,6 @@ class _TelemetryGridPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _TelemetryGridPainter oldDelegate) =>
       oldDelegate.lineColor != lineColor || oldDelegate.diagonalColor != diagonalColor;
-}
-
-class _OpsStripTag extends StatelessWidget {
-  const _OpsStripTag({
-    required this.icon,
-    required this.text,
-    required this.scheme,
-  });
-
-  final IconData icon;
-  final String text;
-  final ColorScheme scheme;
-
-  @override
-  Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: scheme.onPrimary.withValues(alpha: 0.13),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: scheme.onPrimary.withValues(alpha: 0.24)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-        child: Row(
-          children: [
-            Icon(icon, size: 17, color: scheme.onPrimary.withValues(alpha: 0.92)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                text,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: scheme.onPrimary.withValues(alpha: 0.96),
-                  height: 1.2,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _DrawerNavTile extends StatelessWidget {

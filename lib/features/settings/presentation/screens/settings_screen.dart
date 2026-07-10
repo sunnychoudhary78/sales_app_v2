@@ -6,6 +6,8 @@ import '../../../../shared/widgets/premium_shell.dart';
 import '../../../../shared/widgets/screen_accent_backdrop.dart';
 import '../../../../core/theme/app_theme_provider.dart';
 import '../../../../core/theme/theme_mode_provider.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../shared/widgets/organization_line.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -15,6 +17,7 @@ class SettingsScreen extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
     final primary = ref.watch(appThemeProvider);
     final scheme = Theme.of(context).colorScheme;
+    final companyCtx = ref.watch(companyContextProvider);
 
     final presets = <Color>[
       const Color(0xFF0284C7),
@@ -38,6 +41,56 @@ class SettingsScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
           children: [
+            PremiumFeatureHeader(
+              icon: Icons.apartment_rounded,
+              title: 'Organization',
+              subtitle: companyCtx.spansMultipleCompanies
+                  ? 'Your account spans multiple companies in your organization.'
+                  : 'Company linked to your mobile account.',
+            ),
+            const SizedBox(height: 12),
+            PremiumCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Organization',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 10),
+                  OrganizationLine.fromContext(
+                    companyCtx,
+                    iconSize: 18,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    textColor: scheme.onSurface,
+                  ),
+                  if (companyCtx.isSubCompany) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Sub-company account',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                  if (companyCtx.spansMultipleCompanies) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'You can view data across your organization.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
             PremiumFeatureHeader(
               icon: Icons.palette_outlined,
               title: 'Look & feel',

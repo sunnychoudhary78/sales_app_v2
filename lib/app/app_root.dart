@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/auth/company_context.dart';
 import '../core/providers/user_data_invalidation.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/auth/presentation/screens/login_screen.dart';
@@ -15,7 +16,7 @@ class AppRoot extends ConsumerStatefulWidget {
 
 class _AppRootState extends ConsumerState<AppRoot> {
   bool _autoLoginAttempted = false;
-  String? _lastUserId;
+  String? _lastTenantKey;
 
   @override
   void initState() {
@@ -30,13 +31,16 @@ class _AppRootState extends ConsumerState<AppRoot> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
-    final currentUserId = auth.profile?.userId;
+    final company = CompanyContext.fromUser(auth.rawUser);
+    final userId = auth.profile?.userId;
+    final tenantKey =
+        userId != null ? company.tenantScopeKey(userId) : null;
 
-    if (currentUserId != null && _lastUserId != currentUserId) {
-      _lastUserId = currentUserId;
+    if (tenantKey != null && _lastTenantKey != tenantKey) {
+      _lastTenantKey = tenantKey;
       invalidateAllUserScopedData(ref);
-    } else if (currentUserId == null) {
-      _lastUserId = null;
+    } else if (tenantKey == null) {
+      _lastTenantKey = null;
     }
 
     if (auth.isInitializing) {
@@ -53,4 +57,3 @@ class _AppRootState extends ConsumerState<AppRoot> {
     );
   }
 }
-

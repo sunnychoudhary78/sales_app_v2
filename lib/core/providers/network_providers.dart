@@ -21,10 +21,13 @@ final dioClientProvider = Provider<DioClient>((ref) {
     onUnauthorized: () async {
       await ref.read(authProvider.notifier).logout();
     },
+    onSubscriptionInactive: (message) async {
+      await ref.read(authProvider.notifier).storeSubscriptionInactiveMessage(message);
+      await ref.read(authProvider.notifier).logout();
+    },
   );
 });
 
 final dioProvider = Provider<Dio>((ref) {
   return ref.read(dioClientProvider).dio;
 });
-

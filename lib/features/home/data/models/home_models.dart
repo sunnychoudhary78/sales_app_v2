@@ -263,18 +263,25 @@ class TimelineEvent {
 /// Bundle for the home UI: tracking insights + quick modules context.
 class HomeDashboardContent {
   final bool insightsEnabled;
+  final bool isCurrentMonthMtd;
   final HomePerformanceData performance;
   final HomeTimelineData timeline;
+  final DateTime? displayRangeStart;
+  final DateTime? displayRangeEnd;
 
   const HomeDashboardContent({
     required this.insightsEnabled,
+    this.isCurrentMonthMtd = true,
     required this.performance,
     required this.timeline,
+    this.displayRangeStart,
+    this.displayRangeEnd,
   });
 
   factory HomeDashboardContent.noInsights() {
     return HomeDashboardContent(
       insightsEnabled: false,
+      isCurrentMonthMtd: true,
       performance: HomePerformanceData.empty(),
       timeline: HomeTimelineData.empty(),
     );

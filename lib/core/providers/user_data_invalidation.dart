@@ -14,6 +14,7 @@ void invalidateAllUserScopedData(dynamic ref) {
   ref.invalidate(productsProvider);
   ref.invalidate(homeDashboardProvider);
   ref.invalidate(myClaimPreviewProvider);
+  ref.invalidate(myClaimDistanceHistoryProvider);
   ref.invalidate(managerClaimRequestsProvider);
   ref.invalidate(notificationsProvider);
   ref.invalidate(unreadCountProvider);

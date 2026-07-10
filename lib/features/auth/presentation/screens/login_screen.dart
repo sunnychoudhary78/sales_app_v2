@@ -37,6 +37,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   bool _hidePassword = true;
   String _loginError = '';
+  String? _subscriptionBanner;
   int _pageIndex = 0;
   int _otpKey = 0;
   int _forgotKey = 0;
@@ -54,6 +55,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       vsync: this,
       duration: const Duration(seconds: 9),
     )..repeat();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final msg =
+          await ref.read(authProvider.notifier).consumeSubscriptionInactiveMessage();
+      if (!mounted || msg == null || msg.isEmpty) return;
+      setState(() => _subscriptionBanner = msg);
+    });
   }
 
   @override
@@ -202,6 +210,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           Positioned.fill(
             child: LoginTrackingBackground(animation: _bgCtrl),
           ),
+          if (_subscriptionBanner != null)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: MaterialBanner(
+                  backgroundColor: Theme.of(context).colorScheme.errorContainer,
+                  content: Text(
+                    _subscriptionBanner!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onErrorContainer,
+                    ),
+                  ),
+                  leading: Icon(
+                    Icons.warning_amber_rounded,
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => setState(() => _subscriptionBanner = null),
+                      child: const Text('Dismiss'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           SafeArea(
             child: Center(
               child: SingleChildScrollView(

@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 
+import '../../../core/device/battery_level.dart';
+import '../../../core/device/device_info_payload.dart';
 import '../../../core/network/api_constants.dart';
 import '../../../core/providers/network_providers.dart';
 
@@ -10,7 +12,7 @@ class TrackingApiService {
   TrackingApiService(this._dio);
 
   Future<String?> checkIn() async {
-    final payload = await _buildLocationPayload();
+    final payload = await _buildCheckInPayload();
     final res = await _dio.post(ApiConstants.checkIn, data: payload);
     final data = res.data;
     if (data is Map) {
@@ -21,9 +23,16 @@ class TrackingApiService {
     return null;
   }
 
-  Future<void> checkOut() async {
-    final payload = await _buildLocationPayload();
-    await _dio.post(ApiConstants.checkOut, data: payload);
+  /// Returns true when the session is closed (including already-closed 404).
+  Future<bool> checkOut() async {
+    final payload = await _buildLocationPayload(includeBattery: true);
+    try {
+      await _dio.post(ApiConstants.checkOut, data: payload);
+      return true;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 404) return true;
+      rethrow;
+    }
   }
 
   Future<List<Map<String, dynamic>>> fetchHistory({int limit = 50}) async {
@@ -103,7 +112,16 @@ class TrackingApiService {
     return const [];
   }
 
-  Future<Map<String, dynamic>> _buildLocationPayload() async {
+  Future<Map<String, dynamic>> _buildCheckInPayload() async {
+    final payload = await _buildLocationPayload();
+    final deviceInfo = await readDeviceInfoPayload();
+    if (deviceInfo != null && deviceInfo.isNotEmpty) {
+      payload['device_info'] = deviceInfo;
+    }
+    return payload;
+  }
+
+  Future<Map<String, dynamic>> _buildLocationPayload({bool includeBattery = false}) async {
     try {
       final pos = await Geolocator.getCurrentPosition(
         locationSettings: const LocationSettings(
@@ -111,12 +129,19 @@ class TrackingApiService {
           timeLimit: Duration(seconds: 15),
         ),
       );
-      return {
+      final payload = <String, dynamic>{
         'latitude': pos.latitude,
         'longitude': pos.longitude,
         'accuracy': pos.accuracy,
         'recorded_at': pos.timestamp.toUtc().toIso8601String(),
       };
+      if (includeBattery) {
+        final batteryPercent = await readBatteryPercent();
+        if (batteryPercent != null) {
+          payload['battery_percent'] = batteryPercent;
+        }
+      }
+      return payload;
     } catch (_) {
       return {};
     }

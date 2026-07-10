@@ -20,7 +20,7 @@ class TrackingDbService {
     final path = join(await getDatabasesPath(), 'sales_tracking_v2_points.db');
     return openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (db, version) async {
         await db.execute('''
           CREATE TABLE location_points(
@@ -30,10 +30,18 @@ class TrackingDbService {
             accuracy REAL,
             speed REAL,
             heading REAL,
+            battery_percent INTEGER,
             recordedAt TEXT NOT NULL,
             isSynced INTEGER DEFAULT 0
           )
         ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          await db.execute(
+            'ALTER TABLE location_points ADD COLUMN battery_percent INTEGER',
+          );
+        }
       },
     );
   }

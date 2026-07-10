@@ -7,6 +7,7 @@ import '../../../../shared/widgets/app_side_drawer.dart';
 import '../../../../shared/widgets/premium_shell.dart';
 import '../../../../shared/widgets/screen_accent_backdrop.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../application/location_disclosure_coordinator.dart';
 import '../../data/models/tracking_session_model.dart';
 import '../providers/tracking_provider.dart';
 import 'tracking_session_map_full_screen.dart';
@@ -333,7 +334,15 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                       child: FilledButton.icon(
                         onPressed: (s.isLoading || s.isTracking)
                             ? null
-                            : () => ref.read(trackingProvider.notifier).checkIn(),
+                            : () async {
+                                final ok =
+                                    await LocationDisclosureCoordinator.ensureAccepted(
+                                  context,
+                                  ref,
+                                );
+                                if (!ok || !context.mounted) return;
+                                ref.read(trackingProvider.notifier).checkIn();
+                              },
                         icon: s.isLoading && !s.isTracking
                             ? SizedBox(
                                 width: 20,
@@ -540,28 +549,49 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                                         ? Icons.expand_less_rounded
                                         : Icons.map_rounded,
                                   ),
-                                  label: Text(expanded ? 'Hide map' : 'Show map'),
+                                  label: Text(expanded ? 'Hide map' : 'Preview route'),
                                 ),
                                 if (expanded)
-                                  TextButton.icon(
+                                  FilledButton.tonalIcon(
                                     onPressed: () {
                                       Navigator.of(context).push(
                                         MaterialPageRoute<void>(
                                           builder: (_) =>
                                               TrackingSessionMapFullScreen(
                                             sessionId: item.id,
+                                            checkInAt: item.checkInAt,
+                                            checkOutAt: item.checkOutAt,
+                                            totalDistanceKm: item.totalDistanceKm,
+                                            sessionStatus: item.status,
+                                            userName: item.userDisplayName,
                                           ),
                                         ),
                                       );
                                     },
-                                    icon: const Icon(Icons.open_in_full_rounded),
-                                    label: const Text('Full screen'),
+                                    icon: const Icon(Icons.play_circle_outline_rounded, size: 20),
+                                    label: const Text('Replay full screen'),
                                   ),
                               ],
                             ),
                             if (expanded) ...[
-                              const SizedBox(height: 4),
-                              SessionRouteMapPreview(sessionId: item.id),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Tap Replay full screen to play the route at different speeds.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: scheme.onSurfaceVariant,
+                                  height: 1.3,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              SessionRouteMapPreview(
+                                sessionId: item.id,
+                                height: 260,
+                                checkInAt: item.checkInAt,
+                                checkOutAt: item.checkOutAt,
+                                totalDistanceKm: item.totalDistanceKm,
+                                sessionStatus: item.status,
+                              ),
                             ],
                           ],
                         ],

@@ -42,6 +42,21 @@ class ClaimsRepository {
     await _dio.post('/claims/my/submit', data: payload);
   }
 
+  Future<List<Map<String, dynamic>>> fetchMyDistanceHistory({int months = 12}) async {
+    final res = await _dio.get(
+      '/claims/my/distance-history',
+      queryParameters: {'months': months},
+    );
+    final data = res.data;
+    if (data is Map && data['data'] is List) {
+      return (data['data'] as List)
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    }
+    return const [];
+  }
+
   Future<List<Map<String, dynamic>>> fetchManagerRequests() async {
     final res = await _dio.get(
       '/claims/manager/requests',

@@ -6,6 +6,7 @@ class LocationPoint {
     this.accuracy,
     this.speed,
     this.heading,
+    this.batteryPercent,
     required this.recordedAt,
     this.isSynced = 0,
   });
@@ -16,6 +17,7 @@ class LocationPoint {
   final double? accuracy;
   final double? speed;
   final double? heading;
+  final int? batteryPercent;
   final String recordedAt;
   final int isSynced;
 
@@ -27,6 +29,7 @@ class LocationPoint {
       'accuracy': accuracy,
       'speed': speed,
       'heading': heading,
+      'battery_percent': batteryPercent,
       'recordedAt': recordedAt,
       'isSynced': isSynced,
     };
@@ -40,6 +43,7 @@ class LocationPoint {
       accuracy: (map['accuracy'] as num?)?.toDouble(),
       speed: (map['speed'] as num?)?.toDouble(),
       heading: (map['heading'] as num?)?.toDouble(),
+      batteryPercent: (map['battery_percent'] as num?)?.toInt(),
       recordedAt: map['recordedAt']?.toString() ?? '',
       isSynced: (map['isSynced'] as num?)?.toInt() ?? 0,
     );

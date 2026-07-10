@@ -3,11 +3,13 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/auth/company_context.dart';
 import '../../../../core/network/api_constants.dart';
 import '../../../../core/providers/network_providers.dart';
 import '../../../../core/providers/user_data_invalidation.dart';
 import '../../../../core/storage/storage_keys.dart';
 import '../../../../main.dart';
+import '../../../../shared/utils/permission_utils.dart';
 import '../../../notifications/application/push_notification_coordinator.dart';
 import '../../../tracking/data/background_tracking_service.dart';
 import 'auth_state.dart';
@@ -40,23 +42,32 @@ class AuthNotifier extends Notifier<AuthState> {
     return fallback;
   }
 
-  Future<void> _persistLoginBody(Map<String, dynamic> body) async {
-    final token = (body['SALES_JWT_TOKEN'] ?? body['token'])?.toString();
-    final user = body['user'];
-
-    if (token == null || token.isEmpty) {
-      throw Exception('Token not found in response');
-    }
-
-    if (user is! Map) {
-      throw Exception('User data not found in response');
-    }
-
-    final rawUser = Map<String, dynamic>.from(user);
-
+  bool _canLoginMobile(Map<String, dynamic> rawUser) {
     final role = rawUser['role'];
-    if (role is Map && role['can_login_mobile'] != true) {
+    if (role is Map && role['can_login_mobile'] == true) return true;
+    return hasPermission(rawUser, 'auth.login.mobile');
+  }
+
+  void _assertCanLoginMobile(Map<String, dynamic> rawUser) {
+    if (!_canLoginMobile(rawUser)) {
       throw Exception('You do not have permission to login to the mobile app');
+    }
+  }
+
+  Future<void> _registerPushToken() async {
+    try {
+      final dio = ref.read(dioProvider);
+      await PushNotificationCoordinator.instance.registerTokenWithBackend(dio);
+    } catch (_) {}
+  }
+
+  Future<void> _applyUserSession(
+    Map<String, dynamic> rawUser, {
+    required String token,
+    bool validateMobileLogin = true,
+  }) async {
+    if (validateMobileLogin) {
+      _assertCanLoginMobile(rawUser);
     }
 
     final tokenStorage = ref.read(tokenStorageProvider);
@@ -75,12 +86,50 @@ class AuthNotifier extends Notifier<AuthState> {
       rawUser: rawUser,
     );
 
-    Future.microtask(() async {
-      try {
-        final dio = ref.read(dioProvider);
-        await PushNotificationCoordinator.instance.registerTokenWithBackend(dio);
-      } catch (_) {}
-    });
+    Future.microtask(_registerPushToken);
+  }
+
+  /// Fetches latest user profile (including company context) from the server.
+  Future<bool> refreshSessionFromServer({bool validateMobileLogin = false}) async {
+    try {
+      final tokenStorage = ref.read(tokenStorageProvider);
+      final token = await tokenStorage.getJwt();
+      if (token == null || token.isEmpty) return false;
+
+      final dio = ref.read(dioProvider);
+      final res = await dio.get<dynamic>(ApiConstants.userProfile);
+      final raw = res.data;
+      if (raw is! Map) return false;
+
+      final user = raw['user'] ?? raw;
+      if (user is! Map) return false;
+
+      await _applyUserSession(
+        Map<String, dynamic>.from(user),
+        token: token,
+        validateMobileLogin: validateMobileLogin,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _persistLoginBody(Map<String, dynamic> body) async {
+    final token = (body['SALES_JWT_TOKEN'] ?? body['token'])?.toString();
+    final user = body['user'];
+
+    if (token == null || token.isEmpty) {
+      throw Exception('Token not found in response');
+    }
+
+    if (user is! Map) {
+      throw Exception('User data not found in response');
+    }
+
+    final rawUser = Map<String, dynamic>.from(user);
+    await _applyUserSession(rawUser, token: token);
+    await refreshSessionFromServer();
   }
 
   Future<void> tryAutoLogin() async {
@@ -94,25 +143,14 @@ class AuthNotifier extends Notifier<AuthState> {
       final rawUser = await userStorage.getUser();
 
       if (token != null && token.isNotEmpty && rawUser != null) {
-        final name =
-            (rawUser['name'] ?? rawUser['full_name'] ?? 'User').toString();
-        final userId = (rawUser['id'] ?? rawUser['user_id'] ?? '0').toString();
-        final email = rawUser['email']?.toString();
-
-        state = AuthState(
-          isInitializing: false,
-          isAuthenticating: false,
-          profile: AuthProfile(userId: userId, name: name, email: email),
-          rawUser: rawUser,
-        );
-
-        Future.microtask(() async {
-          try {
-            final dio = ref.read(dioProvider);
-            await PushNotificationCoordinator.instance
-                .registerTokenWithBackend(dio);
-          } catch (_) {}
-        });
+        final refreshed = await refreshSessionFromServer();
+        if (!refreshed) {
+          await _applyUserSession(
+            rawUser,
+            token: token,
+            validateMobileLogin: false,
+          );
+        }
         return;
       }
     } catch (_) {
@@ -128,6 +166,27 @@ class AuthNotifier extends Notifier<AuthState> {
       profile: null,
       rawUser: null,
     );
+  }
+
+  static const String defaultSubscriptionInactiveMessage =
+      'Company subscription is inactive or expired. Contact your administrator.';
+
+  Future<void> storeSubscriptionInactiveMessage([String? message]) async {
+    final userStorage = ref.read(userStorageProvider);
+    await userStorage.saveValue(
+      StorageKeys.subscriptionInactiveMessage,
+      message?.trim().isNotEmpty == true ? message!.trim() : defaultSubscriptionInactiveMessage,
+    );
+  }
+
+  Future<String?> consumeSubscriptionInactiveMessage() async {
+    final userStorage = ref.read(userStorageProvider);
+    final msg = await userStorage.getValue(StorageKeys.subscriptionInactiveMessage);
+    if (msg != null && msg.isNotEmpty) {
+      await userStorage.remove(StorageKeys.subscriptionInactiveMessage);
+      return msg;
+    }
+    return null;
   }
 
   Future<void> loginWithPassword({
@@ -352,3 +411,6 @@ final authProvider = NotifierProvider<AuthNotifier, AuthState>(
   AuthNotifier.new,
 );
 
+final companyContextProvider = Provider<CompanyContext>((ref) {
+  return CompanyContext.fromUser(ref.watch(authProvider).rawUser);
+});

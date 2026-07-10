@@ -92,12 +92,17 @@ class HomeDashboardBody extends ConsumerWidget {
                     HomeTrackingDashboardHero(
                       performance: data.performance,
                       displayName: auth.profile?.name ?? '',
+                      showLiveBadge: data.isCurrentMonthMtd,
+                      displayRangeStart: data.displayRangeStart,
+                      displayRangeEnd: data.displayRangeEnd,
                     ).animate().fadeIn(duration: 340.ms).slideY(begin: 0.05, end: 0),
                     const SizedBox(height: 20),
-                    HomeLiveTrackingCard(live: data.performance.live)
-                        .animate()
-                        .fadeIn(delay: 70.ms, duration: 360.ms),
-                    const SizedBox(height: 20),
+                    if (data.isCurrentMonthMtd) ...[
+                      HomeLiveTrackingCard(live: data.performance.live)
+                          .animate()
+                          .fadeIn(delay: 70.ms, duration: 360.ms),
+                      const SizedBox(height: 20),
+                    ],
                     HomeDistanceChartCard(byDay: data.performance.byDay)
                         .animate()
                         .fadeIn(delay: 110.ms, duration: 380.ms),

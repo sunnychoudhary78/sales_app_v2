@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
 
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../shared/utils/permission_utils.dart';
@@ -9,17 +8,20 @@ import '../../../../shared/widgets/premium_shell.dart';
 import '../../../../shared/widgets/screen_accent_backdrop.dart';
 import '../../data/claims_repository.dart';
 import '../providers/claims_provider.dart';
+import '../widgets/claim_transparency_widgets.dart';
 
-class ClaimRequestsScreen extends ConsumerWidget {
+class ClaimRequestsScreen extends ConsumerStatefulWidget {
   const ClaimRequestsScreen({super.key});
 
-  static final NumberFormat _inr = NumberFormat.currency(locale: 'en_IN', symbol: '₹');
+  @override
+  ConsumerState<ClaimRequestsScreen> createState() => _ClaimRequestsScreenState();
+}
 
-  static String _money(dynamic v) {
-    if (v == null) return '—';
-    final n = num.tryParse(v.toString());
-    if (n == null) return v.toString();
-    return _inr.format(n);
+class _ClaimRequestsScreenState extends ConsumerState<ClaimRequestsScreen> {
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => ref.invalidate(managerClaimRequestsProvider));
   }
 
   /// API returns camelCase (`systemDistanceKm`, `userDistanceKm`); tolerate legacy keys.
@@ -32,9 +34,12 @@ class ClaimRequestsScreen extends ConsumerWidget {
     return null;
   }
 
+  static Map<String, dynamic> _asClaimMap(Map<String, dynamic> r) {
+    return Map<String, dynamic>.from(r);
+  }
+
   Future<void> _review(
-    BuildContext context,
-    WidgetRef ref, {
+    BuildContext context, {
     required String claimId,
     required String action,
     String? managerRemarks,
@@ -63,8 +68,7 @@ class ClaimRequestsScreen extends ConsumerWidget {
   }
 
   Future<void> _openReviewDialog(
-    BuildContext context,
-    WidgetRef ref, {
+    BuildContext context, {
     required String claimId,
     required String action,
   }) async {
@@ -133,7 +137,6 @@ class ClaimRequestsScreen extends ConsumerWidget {
     if (!context.mounted) return;
     await _review(
       context,
-      ref,
       claimId: claimId,
       action: action,
       managerRemarks: result.$1,
@@ -141,16 +144,8 @@ class ClaimRequestsScreen extends ConsumerWidget {
     );
   }
 
-  Color _statusColor(ColorScheme scheme, String status) {
-    final s = status.toLowerCase();
-    if (s == 'disputed') return scheme.tertiary;
-    if (s == 'approved') return scheme.primary;
-    if (s == 'rejected') return scheme.error;
-    return scheme.outline;
-  }
-
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final user = ref.watch(authProvider).rawUser;
     final roleObj = user == null ? null : user['role'];
     final roleName = ((roleObj is Map ? roleObj['name'] : user?['role_name'])
@@ -251,7 +246,7 @@ class ClaimRequestsScreen extends ConsumerWidget {
                     icon: Icons.approval_rounded,
                     title: 'Manager queue',
                     subtitle:
-                        'Review disputed distance claims: system vs employee distance, amounts, and remarks. Pull down to refresh.',
+                        'Full distance, financial, and activity details for each claim. Expand a card for the audit trail. Pull down to refresh.',
                   ),
                 ),
                 SliverPadding(
@@ -260,112 +255,18 @@ class ClaimRequestsScreen extends ConsumerWidget {
                     itemCount: rows.length,
                     separatorBuilder: (context, index) => const SizedBox(height: 12),
                     itemBuilder: (_, i) {
-                      final r = rows[i];
-                      final id = (r['id'] ?? '').toString();
-                      final u = r['user'] is Map ? (r['user'] as Map) : const {};
-                      final name = (u['name'] ?? u['email'] ?? '-').toString();
-                      final month = (r['monthKey'] ?? r['month_key'] ?? '-').toString();
-                      final status = (r['status'] ?? '-').toString();
-                      final amount = _money(r['amount'] ?? r['approvedAmount']);
-                      final net = r['netAmount'] ?? r['net_amount'];
-                      final systemKm = _numField(r, ['systemDistanceKm', 'system_distance_km']);
-                      final userKm = _numField(r, [
-                        'userDistanceKm',
-                        'user_distance_km',
-                        'correctedDistanceKm',
-                      ]);
-                      final employeeRemarks = (r['remarks'] ?? '').toString();
-                      final st = status.toLowerCase();
-
-                      return PremiumCard(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    name,
-                                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                  ),
-                                ),
-                                PremiumStatusPill(
-                                  label: status,
-                                  color: _statusColor(scheme, status),
-                                  icon: st == 'disputed'
-                                      ? Icons.warning_amber_rounded
-                                      : Icons.check_circle_outline_rounded,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            _InfoRow(icon: Icons.calendar_month_outlined, text: 'Month · $month'),
-                            _InfoRow(icon: Icons.payments_outlined, text: 'Amount · $amount'),
-                            if (net != null)
-                              _InfoRow(
-                                icon: Icons.account_balance_wallet_outlined,
-                                text: 'Net · ${_money(net)}',
-                              ),
-                            _InfoRow(
-                              icon: Icons.route_outlined,
-                              text: 'System distance · ${systemKm != null ? '${systemKm.toStringAsFixed(2)} km' : '—'}',
-                            ),
-                            if (userKm != null)
-                              _InfoRow(
-                                icon: Icons.edit_location_alt_outlined,
-                                text: 'Employee distance · ${userKm.toStringAsFixed(2)} km',
-                              ),
-                            if (employeeRemarks.trim().isNotEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Text(
-                                  employeeRemarks.trim(),
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: scheme.onSurfaceVariant,
-                                    height: 1.35,
-                                  ),
-                                ),
-                              ),
-                            if (st == 'disputed') ...[
-                              const SizedBox(height: 14),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: FilledButton(
-                                      onPressed: id.isEmpty
-                                          ? null
-                                          : () => _openReviewDialog(
-                                                context,
-                                                ref,
-                                                claimId: id,
-                                                action: 'approve',
-                                              ),
-                                      child: const Text('Approve'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: OutlinedButton(
-                                      onPressed: id.isEmpty
-                                          ? null
-                                          : () => _openReviewDialog(
-                                                context,
-                                                ref,
-                                                claimId: id,
-                                                action: 'reject',
-                                              ),
-                                      child: const Text('Reject'),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
+                      final r = _asClaimMap(rows[i]);
+                      return _ManagerClaimCard(
+                        claim: r,
+                        onApprove: (id) => _openReviewDialog(
+                          context,
+                          claimId: id,
+                          action: 'approve',
+                        ),
+                        onReject: (id) => _openReviewDialog(
+                          context,
+                          claimId: id,
+                          action: 'reject',
                         ),
                       );
                     },
@@ -376,6 +277,173 @@ class ClaimRequestsScreen extends ConsumerWidget {
           },
         ),
       ),
+      ),
+    );
+  }
+}
+
+class _ManagerClaimCard extends StatelessWidget {
+  const _ManagerClaimCard({
+    required this.claim,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  final Map<String, dynamic> claim;
+  final void Function(String claimId) onApprove;
+  final void Function(String claimId) onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final id = (claim['id'] ?? '').toString();
+    final u = claim['user'] is Map
+        ? Map<String, dynamic>.from(claim['user'] as Map)
+        : <String, dynamic>{};
+    final name = (u['name'] ?? u['email'] ?? '-').toString();
+    final employeeId = (u['employeeId'] ?? u['employee_id'] ?? '').toString();
+    final company = (u['companyName'] ?? u['company_name'] ?? '').toString();
+    final mobile = (u['mobile'] ?? '').toString();
+    final monthKey = (claim['monthKey'] ?? claim['month_key'] ?? '-').toString();
+    final monthStart = (claim['monthStart'] ?? claim['month_start'] ?? '').toString();
+    final monthEnd = (claim['monthEnd'] ?? claim['month_end'] ?? '').toString();
+    final status = (claim['status'] ?? '-').toString();
+    final st = status.toLowerCase();
+    final systemKm = _ClaimRequestsScreenState._numField(claim, [
+      'systemDistanceKm',
+      'system_distance_km',
+    ]);
+    final userKm = _ClaimRequestsScreenState._numField(claim, [
+      'userDistanceKm',
+      'user_distance_km',
+      'correctedDistanceKm',
+    ]);
+    final approvedKm = _ClaimRequestsScreenState._numField(claim, [
+      'approvedDistanceKm',
+      'approved_distance_km',
+    ]);
+    final rateSnapshot =
+        claim['ratePerKmSnapshot'] ?? claim['rate_per_km_snapshot'];
+    final employeeRemarks = (claim['remarks'] ?? '').toString();
+    final managerRemarks =
+        (claim['managerRemarks'] ?? claim['manager_remarks'] ?? '').toString();
+    final submittedAt = claim['submittedAt'] ?? claim['submitted_at'];
+    final reviewedAt = claim['reviewedAt'] ?? claim['reviewed_at'];
+
+    final periodLabel = monthStart.isNotEmpty && monthEnd.isNotEmpty
+        ? '${ClaimFormatters.formatYmdToDmy(monthStart)} – ${ClaimFormatters.formatYmdToDmy(monthEnd)}'
+        : null;
+
+    return PremiumCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                    if (employeeId.isNotEmpty)
+                      Text(
+                        'ID $employeeId',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    if (company.isNotEmpty)
+                      Text(
+                        company,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    if (mobile.isNotEmpty)
+                      Text(
+                        mobile,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              PremiumStatusPill(
+                label: status,
+                color: ClaimFormatters.statusColor(scheme, status),
+                icon: st == 'disputed'
+                    ? Icons.warning_amber_rounded
+                    : Icons.check_circle_outline_rounded,
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _InfoRow(
+            icon: Icons.calendar_month_outlined,
+            text: ClaimFormatters.formatMonthKey(monthKey),
+          ),
+          if (periodLabel != null)
+            _InfoRow(icon: Icons.date_range_outlined, text: periodLabel),
+          if (id.isNotEmpty)
+            _InfoRow(icon: Icons.tag_outlined, text: 'Ref $id'),
+          if (submittedAt != null)
+            _InfoRow(
+              icon: Icons.schedule_outlined,
+              text: 'Submitted ${ClaimFormatters.formatTimestamp(submittedAt)}',
+            ),
+          if (reviewedAt != null)
+            _InfoRow(
+              icon: Icons.fact_check_outlined,
+              text: 'Reviewed ${ClaimFormatters.formatTimestamp(reviewedAt)}',
+            ),
+          const Divider(height: 24),
+          ClaimDistanceComparisonCard(
+            systemKm: systemKm,
+            userKm: userKm,
+            approvedKm: approvedKm,
+            ratePerKm: rateSnapshot,
+            embedded: true,
+          ),
+          ClaimFinancialBreakdownCard(claim: claim, embedded: true),
+          ClaimSnapshotCard(claim: claim, embedded: true),
+          ClaimRemarksCard(
+            employeeRemarks: employeeRemarks,
+            managerRemarks: managerRemarks,
+            embedded: true,
+          ),
+          ClaimActivityTimeline(claim: claim, embedded: true),
+          if (st == 'disputed') ...[
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    onPressed: id.isEmpty ? null : () => onApprove(id),
+                    child: const Text('Approve'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: id.isEmpty ? null : () => onReject(id),
+                    child: const Text('Reject'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }

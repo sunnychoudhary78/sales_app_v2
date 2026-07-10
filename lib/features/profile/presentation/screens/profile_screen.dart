@@ -14,6 +14,7 @@ import '../../../../shared/widgets/app_side_drawer.dart';
 import '../../../../shared/widgets/premium_shell.dart';
 import '../../../../shared/widgets/profile_avatar_image.dart';
 import '../../../../shared/widgets/screen_accent_backdrop.dart';
+import '../../../../core/auth/company_context.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../home/presentation/widgets/home_dashboard_chrome.dart';
 
@@ -147,6 +148,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final scheme = Theme.of(context).colorScheme;
     final auth = ref.watch(authProvider);
     final user = auth.rawUser ?? const <String, dynamic>{};
+    final companyCtx = CompanyContext.fromUser(user);
 
     final name = (user['name'] ?? auth.profile?.name ?? 'User').toString();
     final email = (user['email'] ?? auth.profile?.email ?? '').toString();
@@ -154,7 +156,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final role = (user['role'] is Map ? user['role']['name'] : user['role_name'])
             ?.toString() ??
         '';
-    final company = (user['company_name'] ?? '').toString();
+    final company = companyCtx.displayCompanyName.isNotEmpty
+        ? companyCtx.displayCompanyName
+        : (user['company_name'] ?? '').toString();
     final initials = _initials(name);
     final avatarUrl = resolveAvatarUrl(user);
     final avatarUrls = resolveAvatarUrlCandidates(user);

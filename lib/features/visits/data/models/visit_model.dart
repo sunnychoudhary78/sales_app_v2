@@ -57,6 +57,10 @@ class VisitModel {
     final createdAtRaw = (json['created_at'] ?? DateTime.now().toIso8601String())
         .toString();
     final createdAt = DateTime.tryParse(createdAtRaw)?.toLocal() ?? DateTime.now();
+    final visitDateRaw = json['visit_date']?.toString();
+    final visitDate = visitDateRaw != null && visitDateRaw.isNotEmpty
+        ? DateTime.tryParse(visitDateRaw)?.toLocal() ?? createdAt
+        : createdAt;
     return VisitModel(
       id: (json['id'] ?? '').toString(),
       clientName: (json['client_name'] ?? '').toString(),
@@ -75,7 +79,7 @@ class VisitModel {
       followUpDate: json['follow_up_date'] != null
           ? DateTime.tryParse(json['follow_up_date'].toString())?.toLocal()
           : null,
-      visitDate: createdAt,
+      visitDate: visitDate,
       createdAt: createdAt,
       latitude: json['latitude'] != null
           ? double.tryParse(json['latitude'].toString())

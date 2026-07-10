@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/network/api_constants.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../shared/widgets/app_side_drawer.dart';
 import '../../../../shared/widgets/premium_shell.dart';
 import '../../../../shared/widgets/screen_accent_backdrop.dart';
+import '../../data/models/visit_filter_state.dart';
 import '../../data/models/visit_model.dart';
 import '../providers/visits_providers.dart';
 
@@ -18,13 +22,35 @@ class VisitsListScreen extends ConsumerStatefulWidget {
 
 class _VisitsListScreenState extends ConsumerState<VisitsListScreen> {
   final _searchCtrl = TextEditingController();
-  DateTime? _selectedDate;
-  String _visitType = 'all';
+  VisitListFilters _filters = const VisitListFilters();
+  Timer? _searchDebounce;
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  void _applyFilters([VisitListFilters? next]) {
+    final merged = (next ?? _filters).copyWith(search: _searchCtrl.text.trim());
+    setState(() => _filters = merged);
+    ref.read(visitsProvider.notifier).applyFilters(merged);
+  }
+
+  void _clearFilters() {
+    _searchDebounce?.cancel();
+    _searchCtrl.clear();
+    setState(() => _filters = const VisitListFilters());
+    ref.read(visitsProvider.notifier).applyFilters(const VisitListFilters());
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 450), () {
+      if (!mounted) return;
+      _applyFilters(_filters.copyWith(search: value.trim()));
+    });
   }
 
   String _photoDisplayUrl(String photoUrl) {
@@ -36,32 +62,103 @@ class _VisitsListScreenState extends ConsumerState<VisitsListScreen> {
     return '$base/$u';
   }
 
-  List<VisitModel> _applyFilters(List<VisitModel> visits) {
-    var list = visits;
-    final q = _searchCtrl.text.trim().toLowerCase();
-    if (q.isNotEmpty) {
-      list = list.where((v) {
-        return v.clientName.toLowerCase().contains(q) ||
-            v.contractorName.toLowerCase().contains(q) ||
-            v.city.toLowerCase().contains(q) ||
-            v.state.toLowerCase().contains(q) ||
-            v.purpose.toLowerCase().contains(q) ||
-            v.contactName.toLowerCase().contains(q);
-      }).toList();
+  String _dateRangeLabel() {
+    if (_filters.startDate == null && _filters.endDate == null) return 'Date range';
+    final fmt = DateFormat('d MMM');
+    if (_filters.startDate != null && _filters.endDate != null) {
+      return '${fmt.format(_filters.startDate!)} – ${fmt.format(_filters.endDate!)}';
     }
-    if (_selectedDate != null) {
-      final d = _selectedDate!;
-      list = list.where((v) {
-        final dt = v.createdAt;
-        return dt.year == d.year && dt.month == d.month && dt.day == d.day;
-      }).toList();
+    if (_filters.startDate != null) {
+      return 'From ${fmt.format(_filters.startDate!)}';
     }
-    if (_visitType == 'new') {
-      list = list.where((v) => v.isNewVisit).toList();
-    } else if (_visitType == 'followup') {
-      list = list.where((v) => !v.isNewVisit).toList();
+    return 'Until ${fmt.format(_filters.endDate!)}';
+  }
+
+  String? _employeeLabel(
+    List<VisitTeamMember> members, {
+    required bool showCompany,
+  }) {
+    if (_filters.employeeId == null || _filters.employeeId!.isEmpty) return null;
+    for (final m in members) {
+      if (m.id == _filters.employeeId) {
+        return m.displayLabel(showCompany: showCompany);
+      }
     }
-    return list;
+    return 'Employee';
+  }
+
+  Future<void> _pickDateRange() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(now.year - 2),
+      lastDate: DateTime(now.year + 2),
+      initialDateRange: _filters.startDate != null && _filters.endDate != null
+          ? DateTimeRange(start: _filters.startDate!, end: _filters.endDate!)
+          : DateTimeRange(
+              start: now.subtract(const Duration(days: 7)),
+              end: now,
+            ),
+    );
+    if (picked == null || !mounted) return;
+    _applyFilters(
+      _filters.copyWith(
+        startDate: picked.start,
+        endDate: picked.end,
+      ),
+    );
+  }
+
+  Future<void> _showEmployeePicker(
+    List<VisitTeamMember> members, {
+    required bool showCompany,
+  }) async {
+    if (members.isEmpty) return;
+    final scheme = Theme.of(context).colorScheme;
+    final selected = await showModalBottomSheet<String?>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: scheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 16),
+            children: [
+              ListTile(
+                leading: const Icon(Icons.groups_rounded),
+                title: const Text('All employees'),
+                selected: _filters.employeeId == null,
+                onTap: () => Navigator.pop(ctx, null),
+              ),
+              const Divider(height: 1),
+              ...members.map(
+                (m) => ListTile(
+                  leading: const Icon(Icons.person_outline_rounded),
+                  title: Text(m.displayLabel(showCompany: showCompany)),
+                  subtitle: m.departmentName != null && m.departmentName!.isNotEmpty
+                      ? Text(m.departmentName!)
+                      : null,
+                  selected: _filters.employeeId == m.id,
+                  onTap: () => Navigator.pop(ctx, m.id),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (!mounted) return;
+    _applyFilters(
+      _filters.copyWith(
+        employeeId: selected,
+        clearEmployeeId: selected == null,
+        scope: VisitScope.all,
+      ),
+    );
   }
 
   void _openVisitSheet(VisitModel visit) {
@@ -194,9 +291,9 @@ class _VisitsListScreenState extends ConsumerState<VisitsListScreen> {
                     value: DateFormat('dd MMM yyyy').format(visit.followUpDate!),
                   ),
                 _SheetRow(
-                  icon: Icons.schedule_rounded,
-                  label: 'Logged',
-                  value: DateFormat('dd MMM yyyy · hh:mm a').format(visit.createdAt),
+                  icon: Icons.event_rounded,
+                  label: 'Visit date',
+                  value: DateFormat('dd MMM yyyy · hh:mm a').format(visit.visitDate),
                 ),
                 if (visit.createdByName.isNotEmpty)
                   _SheetRow(
@@ -234,10 +331,122 @@ class _VisitsListScreenState extends ConsumerState<VisitsListScreen> {
     );
   }
 
+  Widget _filterChipRow({
+    required ColorScheme scheme,
+    required bool canFilterTeam,
+    required List<VisitTeamMember> teamMembers,
+    required bool showCompany,
+  }) {
+    final employeeLabel = _employeeLabel(teamMembers, showCompany: showCompany);
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          if (canFilterTeam) ...[
+            _FilterChip(
+              label: 'All',
+              selected: _filters.scope == VisitScope.all &&
+                  (_filters.employeeId == null || _filters.employeeId!.isEmpty),
+              onTap: () => _applyFilters(
+                _filters.copyWith(scope: VisitScope.all, clearEmployeeId: true),
+              ),
+            ),
+            _FilterChip(
+              label: 'My visits',
+              selected: _filters.scope == VisitScope.mine &&
+                  (_filters.employeeId == null || _filters.employeeId!.isEmpty),
+              onTap: () => _applyFilters(
+                _filters.copyWith(scope: VisitScope.mine, clearEmployeeId: true),
+              ),
+            ),
+            _FilterChip(
+              label: 'Team',
+              selected: _filters.scope == VisitScope.team &&
+                  (_filters.employeeId == null || _filters.employeeId!.isEmpty),
+              onTap: () => _applyFilters(
+                _filters.copyWith(scope: VisitScope.team, clearEmployeeId: true),
+              ),
+            ),
+            if (teamMembers.length > 1)
+              Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ActionChip(
+                  avatar: Icon(
+                    Icons.person_search_rounded,
+                    size: 18,
+                    color: employeeLabel != null
+                        ? scheme.onSecondaryContainer
+                        : scheme.onSurfaceVariant,
+                  ),
+                  label: Text(
+                    employeeLabel ?? 'Employee',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onPressed: () => _showEmployeePicker(
+                    teamMembers,
+                    showCompany: showCompany,
+                  ),
+                ),
+              ),
+            const SizedBox(width: 4),
+          ],
+          _FilterChip(
+            label: 'New',
+            selected: _filters.visitType == VisitTypeFilter.newVisit,
+            onTap: () => _applyFilters(
+              _filters.copyWith(visitType: VisitTypeFilter.newVisit),
+            ),
+          ),
+          _FilterChip(
+            label: 'Follow-up',
+            selected: _filters.visitType == VisitTypeFilter.followup,
+            onTap: () => _applyFilters(
+              _filters.copyWith(visitType: VisitTypeFilter.followup),
+            ),
+          ),
+          if (_filters.visitType != VisitTypeFilter.all)
+            _FilterChip(
+              label: 'All types',
+              selected: false,
+              onTap: () => _applyFilters(
+                _filters.copyWith(visitType: VisitTypeFilter.all),
+              ),
+            ),
+          const SizedBox(width: 8),
+          ActionChip(
+            avatar: Icon(
+              Icons.date_range_rounded,
+              size: 18,
+              color: _filters.startDate != null || _filters.endDate != null
+                  ? scheme.onSecondaryContainer
+                  : scheme.onSurfaceVariant,
+            ),
+            label: Text(_dateRangeLabel()),
+            onPressed: _pickDateRange,
+          ),
+          if (_filters.hasActiveFilters)
+            Padding(
+              padding: const EdgeInsets.only(left: 6),
+              child: ActionChip(
+                avatar: Icon(Icons.filter_alt_off_rounded,
+                    size: 18, color: scheme.error),
+                label: const Text('Clear'),
+                onPressed: _clearFilters,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final visitsAsync = ref.watch(visitsProvider);
     final scheme = Theme.of(context).colorScheme;
+    final listState = visitsAsync.asData?.value;
+    final canFilterTeam = listState?.meta.canFilterTeam ?? false;
+    final teamMembers = listState?.teamMembers ?? const [];
+    final showCompany = ref.watch(companyContextProvider).spansMultipleCompanies;
 
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
@@ -250,158 +459,120 @@ class _VisitsListScreenState extends ConsumerState<VisitsListScreen> {
         spot: DrawerRouteAccents.visits,
         spot2: DrawerRouteAccents.visitsMagenta,
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          PremiumFeatureHeader(
-            icon: Icons.route_rounded,
-            title: 'Field visit log',
-            subtitle:
-                'Filter by type or day, search parties and locations, then open a card for the full story.',
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: PremiumCard(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: TextField(
-                controller: _searchCtrl,
-                onChanged: (_) => setState(() {}),
-                decoration: _searchDecoration(context, scheme),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            PremiumFeatureHeader(
+              icon: Icons.route_rounded,
+              title: 'Field visit log',
+              subtitle: canFilterTeam
+                  ? 'Filter your visits, your team, or by employee, date range, and type.'
+                  : 'Search parties and locations, filter by date or type, then open a card for details.',
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: PremiumCard(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: TextField(
+                  controller: _searchCtrl,
+                  onChanged: _onSearchChanged,
+                  onSubmitted: (_) => _applyFilters(),
+                  decoration: _searchDecoration(context, scheme),
+                ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _FilterChip(
-                    label: 'All',
-                    selected: _visitType == 'all',
-                    onTap: () => setState(() => _visitType = 'all'),
-                  ),
-                  _FilterChip(
-                    label: 'New',
-                    selected: _visitType == 'new',
-                    onTap: () => setState(() => _visitType = 'new'),
-                  ),
-                  _FilterChip(
-                    label: 'Follow-up',
-                    selected: _visitType == 'followup',
-                    onTap: () => setState(() => _visitType = 'followup'),
-                  ),
-                  const SizedBox(width: 8),
-                  ActionChip(
-                    avatar: Icon(
-                      Icons.calendar_month_rounded,
-                      size: 18,
-                      color: _selectedDate != null
-                          ? scheme.onSecondaryContainer
-                          : scheme.onSurfaceVariant,
-                    ),
-                    label: Text(
-                      _selectedDate == null
-                          ? 'Any day'
-                          : DateFormat('d MMM').format(_selectedDate!),
-                    ),
-                    onPressed: () async {
-                      final now = DateTime.now();
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _selectedDate ?? now,
-                        firstDate: DateTime(now.year - 2),
-                        lastDate: DateTime(now.year + 2),
-                      );
-                      if (picked != null) {
-                        setState(() => _selectedDate = picked);
-                      }
-                    },
-                  ),
-                  if (_selectedDate != null ||
-                      _visitType != 'all' ||
-                      _searchCtrl.text.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 6),
-                      child: ActionChip(
-                        avatar: Icon(Icons.filter_alt_off_rounded,
-                            size: 18, color: scheme.error),
-                        label: const Text('Clear'),
-                        onPressed: () {
-                          setState(() {
-                            _searchCtrl.clear();
-                            _selectedDate = null;
-                            _visitType = 'all';
-                          });
-                        },
-                      ),
-                    ),
-                ],
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: _filterChipRow(
+                scheme: scheme,
+                canFilterTeam: canFilterTeam,
+                teamMembers: teamMembers,
+                showCompany: showCompany,
               ),
             ),
-          ),
-          Expanded(
-            child: RefreshIndicator(
-              color: scheme.primary,
-              onRefresh: () => ref.read(visitsProvider.notifier).refresh(),
-              child: visitsAsync.when(
-                loading: () => ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(vertical: 120),
-                  children: [
-                    Center(
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: scheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-                error: (error, _) => ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(24),
-                  children: [
-                    PremiumEmptyState(
-                      icon: Icons.cloud_off_rounded,
-                      title: 'Could not load visits',
-                      subtitle: error.toString(),
-                    ),
-                  ],
-                ),
-                data: (visits) {
-                  final filtered = _applyFilters(visits);
-                  if (filtered.isEmpty) {
-                    return ListView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 100),
-                      children: [
-                        PremiumEmptyState(
-                          icon: Icons.travel_explore_rounded,
-                          title: visits.isEmpty ? 'No visits yet' : 'No matches',
-                          subtitle: visits.isEmpty
-                              ? 'Log your first visit to see it here with photo, rating, and location.'
-                              : 'Try widening search or clearing filters.',
-                        ),
-                      ],
-                    );
-                  }
-                  return ListView.separated(
+            Expanded(
+              child: RefreshIndicator(
+                color: scheme.primary,
+                onRefresh: () => ref.read(visitsProvider.notifier).refresh(),
+                child: visitsAsync.when(
+                  loading: () => ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
-                    itemCount: filtered.length,
-                    separatorBuilder: (context, index) =>
-                        const SizedBox(height: 12),
-                    itemBuilder: (_, index) => _VisitCard(
-                      visit: filtered[index],
-                      photoUrl: _photoDisplayUrl(filtered[index].photoUrl),
-                      onTap: () => _openVisitSheet(filtered[index]),
-                    ),
-                  );
-                },
+                    padding: const EdgeInsets.symmetric(vertical: 120),
+                    children: [
+                      Center(
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: scheme.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  error: (error, _) => ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(24),
+                    children: [
+                      PremiumEmptyState(
+                        icon: Icons.cloud_off_rounded,
+                        title: 'Could not load visits',
+                        subtitle: error.toString(),
+                      ),
+                    ],
+                  ),
+                  data: (state) {
+                    final visits = state.visits;
+                    final showRecordedBy = canFilterTeam &&
+                        _filters.scope != VisitScope.mine &&
+                        (_filters.employeeId == null ||
+                            _filters.employeeId!.isEmpty);
+                    final companyByUserId = showCompany
+                        ? <String, String>{
+                            for (final m in teamMembers)
+                              if (m.companyName != null &&
+                                  m.companyName!.trim().isNotEmpty)
+                                m.id: m.companyName!.trim(),
+                          }
+                        : const <String, String>{};
+                    if (visits.isEmpty) {
+                      return ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(16, 24, 16, 100),
+                        children: [
+                          PremiumEmptyState(
+                            icon: Icons.travel_explore_rounded,
+                            title: _filters.hasActiveFilters
+                                ? 'No matches'
+                                : 'No visits yet',
+                            subtitle: _filters.hasActiveFilters
+                                ? 'Try widening search or clearing filters.'
+                                : 'Log your first visit to see it here with photo, rating, and location.',
+                          ),
+                        ],
+                      );
+                    }
+                    return ListView.separated(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 100),
+                      itemCount: visits.length,
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 12),
+                      itemBuilder: (_, index) {
+                        final visit = visits[index];
+                        return _VisitCard(
+                          visit: visit,
+                          photoUrl: _photoDisplayUrl(visit.photoUrl),
+                          showRecordedBy: showRecordedBy,
+                          recordedByCompanyName: showCompany && showRecordedBy
+                              ? companyByUserId[visit.createdById]
+                              : null,
+                          onTap: () => _openVisitSheet(visit),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () async {
@@ -456,11 +627,24 @@ class _VisitCard extends StatelessWidget {
     required this.visit,
     required this.photoUrl,
     required this.onTap,
+    this.showRecordedBy = false,
+    this.recordedByCompanyName,
   });
 
   final VisitModel visit;
   final String photoUrl;
   final VoidCallback onTap;
+  final bool showRecordedBy;
+  final String? recordedByCompanyName;
+
+  String _recordedByLabel() {
+    final name = visit.createdByName.trim();
+    final company = recordedByCompanyName?.trim();
+    if (company != null && company.isNotEmpty) {
+      return '$name · $company';
+    }
+    return name;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -566,6 +750,28 @@ class _VisitCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
+                if (showRecordedBy && visit.createdByName.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(Icons.badge_outlined,
+                          size: 14, color: scheme.onSurfaceVariant),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          _recordedByLabel(),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 8),
                 Row(
                   children: [
@@ -585,7 +791,7 @@ class _VisitCard extends StatelessWidget {
                         size: 15, color: scheme.onSurfaceVariant),
                     const SizedBox(width: 4),
                     Text(
-                      DateFormat('dd MMM · h:mm a').format(visit.createdAt),
+                      DateFormat('dd MMM · h:mm a').format(visit.visitDate),
                       style: TextStyle(
                         fontSize: 12,
                         color: scheme.onSurfaceVariant,
