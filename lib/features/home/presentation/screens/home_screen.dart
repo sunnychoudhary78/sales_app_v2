@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:sales_tracking_v2/features/home/presentation/widgets/dashboard_app_bar_title.dart';
 
-import '../../../../shared/utils/permission_utils.dart';
 import '../../../../shared/widgets/app_side_drawer.dart';
 import '../../../../shared/widgets/premium_shell.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../providers/home_dashboard_provider.dart';
 import '../widgets/home_dashboard_body.dart';
-import '../widgets/home_month_picker.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -17,14 +17,18 @@ class HomeScreen extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final auth = ref.watch(authProvider);
     final user = auth.rawUser;
-    final showMonthPicker = hasPermission(user, 'tracking.sync');
 
     final displayName =
-        (user is Map ? user['name'] : null)?.toString()
-        ?? auth.profile?.name
-        ?? '';
+        (user?['name'] ?? auth.profile?.name ?? '').toString();
 
-     final currentPeriod = 'July 2026'; 
+    final selectedMonth = ref.watch(homeSelectedMonthProvider);
+    final now = DateTime.now();
+    final monthForLabel = (selectedMonth != null &&
+            !HomeDashboardNotifier.isCurrentMonthMtd(selectedMonth))
+        ? selectedMonth
+        : DateTime(now.year, now.month, 1);
+    final currentPeriod = DateFormat('MMMM yyyy').format(monthForLabel);
+    final isLive = HomeDashboardNotifier.isCurrentMonthMtd(selectedMonth);
 
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
@@ -32,15 +36,10 @@ class HomeScreen extends ConsumerWidget {
       appBar: SalesGlassAppBar(
         titleWidget: DashboardAppBarTitle(
           displayName: displayName,
-          periodLabel: currentPeriod, // Passed dynamic value here
-          showLiveBadge: true,
+          periodLabel: currentPeriod,
+          showLiveBadge: isLive,
         ),
         showDrawer: true,
-        // actions: [
-        //   // Clear actions bar if permission is available
-        //   if (showMonthPicker) const HomeMonthPicker(),
-        //   const SizedBox(width: 8),
-        // ],
       ),
       body: const HomeDashboardBody(),
     );
