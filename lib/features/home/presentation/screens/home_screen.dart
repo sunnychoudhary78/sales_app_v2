@@ -15,13 +15,14 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
-    final user = ref.watch(authProvider).rawUser;
+    final auth = ref.watch(authProvider);
+    final user = auth.rawUser;
     final showMonthPicker = hasPermission(user, 'tracking.sync');
 
-    // 1. User Name extracting logic cleanly
-    final displayName = user is Map
-        ? (user?['displayName']?.toString() ?? '')
-        : (user?.displayName ?? '');
+    final displayName =
+        (user is Map ? user['name'] : null)?.toString()
+        ?? auth.profile?.name
+        ?? '';
 
      final currentPeriod = 'July 2026'; 
 
