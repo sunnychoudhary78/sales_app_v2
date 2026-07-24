@@ -1,21 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:sales_tracking_v2/features/home/presentation/widgets/home_month_picker.dart';
 
 import '../../data/models/home_models.dart';
 
-/// Brand-style accents for the distance hero (stable across theme seeds).
+/// Accent colors adapted for both Light and Dark themes.
 abstract final class _RouteAccent {
   static const Color teal = Color(0xFF0D9488);
   static const Color cyan = Color(0xFF0891B2);
   static const Color deep = Color(0xFF0F766E);
-  static const Color live = Color(0xFF059669);
-  static const Color visits = Color(0xFF7C3AED);
-  static const Color fresh = Color(0xFFD97706);
-  static const Color follow = Color(0xFFDB2777);
+  static const Color live = Color(0xFF10B981);
+  static const Color visits = Color(0xFF8B5CF6);
+  static const Color fresh = Color(0xFFF59E0B);
+  static const Color follow = Color(0xFFEC4899);
 }
 
-/// Flagship home block: month context + animated total km (real [totals.distance_km] from API).
 class HomeTrackingDashboardHero extends StatelessWidget {
   const HomeTrackingDashboardHero({
     super.key,
@@ -78,20 +78,18 @@ class HomeTrackingDashboardHero extends StatelessWidget {
     return _periodLabel(performance.rangeFromIso, performance.rangeToIso);
   }
 
-  static String _firstName(String full) {
-    final t = full.trim();
-    if (t.isEmpty) return '';
-    return t.split(RegExp(r'\s+')).first;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+
     final t = performance.totals;
     final km = t.distanceKm;
-    final animKey = '${performance.rangeFromIso}|${performance.rangeToIso}|${km.toStringAsFixed(4)}';
+    final animKey =
+        '${performance.rangeFromIso}|${performance.rangeToIso}|${km.toStringAsFixed(4)}';
 
-    final border = scheme.outlineVariant.withValues(alpha: 0.38);
+    final border = scheme.outlineVariant.withValues(alpha: isDark ? 0.2 : 0.4);
 
     return Container(
       width: double.infinity,
@@ -101,366 +99,257 @@ class HomeTrackingDashboardHero extends StatelessWidget {
         border: Border.all(color: border),
         boxShadow: [
           BoxShadow(
-            color: scheme.shadow.withValues(alpha: 0.07),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-          BoxShadow(
-            color: _RouteAccent.teal.withValues(alpha: 0.14),
-            blurRadius: 40,
-            offset: const Offset(0, 18),
+            color: scheme.shadow.withValues(alpha: isDark ? 0.25 : 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Top band: context (editorial / standard product header)
-              Container(
-                padding: const EdgeInsets.fromLTRB(20, 18, 16, 16),
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerLow.withValues(alpha: 0.65),
-                  border: Border(bottom: BorderSide(color: border)),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'DISTANCE',
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 1.35,
-                              color: _RouteAccent.deep,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            displayName.trim().isEmpty
-                                ? 'Your overview'
-                                : 'Hi, ${_firstName(displayName)}',
-                            style: GoogleFonts.inter(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.35,
-                              height: 1.2,
-                              color: scheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _resolvePeriodLabel(),
-                            style: GoogleFonts.inter(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: scheme.onSurfaceVariant,
-                              height: 1.3,
-                            ),
-                          ),
-                        ],
-                      ),
+        borderRadius: BorderRadius.circular(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Main Well Container (Circle + Description + Top Right Month Picker)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Stack(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: scheme.surfaceContainerLow,
+                      border: Border.all(color: border),
                     ),
-                    if (showLiveBadge)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: _RouteAccent.live.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: _RouteAccent.live.withValues(alpha: 0.35)),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.verified_rounded, size: 16, color: _RouteAccent.live),
-                            const SizedBox(width: 5),
-                            Text(
-                              'Live',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: _RouteAccent.live,
-                                letterSpacing: 0.2,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Animated KM Circle (Filled Color Upgrade)
+                        TweenAnimationBuilder<double>(
+                          key: ValueKey(animKey),
+                          tween: Tween(begin: 0, end: km),
+                          duration: const Duration(milliseconds: 1600),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, value, _) {
+                            return Container(
+                              width: 100,
+                              height: 100,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                // Gradient Fill for premium modern look
+                                // gradient: RadialGradient(
+                                //   colors: [
+                                //     _RouteAccent.teal.withValues(alpha: isDark ? 0.25 : 0.18),
+                                //     _RouteAccent.teal.withValues(alpha: isDark ? 0.10 : 0.06),
+                                //   ],
+                                //   stops: const [0.5, 1.0],
+                                // ),
+                                border: Border.all(
+                                  color: _RouteAccent.deep.withValues(alpha: 0.50),
+                                  width: 5,
+                                ),
+                                // boxShadow: [
+                                //   BoxShadow(
+                                //     color: _RouteAccent.teal.withValues(
+                                //       alpha: isDark ? 0.25 : 0.12,
+                                //     ),
+                                //     blurRadius: 14,
+                                //     spreadRadius: 2,
+                                //   ),
+                                // ],
                               ),
-                            ),
-                          ],
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6.0,
+                                      ),
+                                      child: Text(
+                                        _formatKmValue(value),
+                                        style: GoogleFonts.inter(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.w900,
+                                          letterSpacing: -0.5,
+                                          color: scheme.onSurface,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  Text(
+                                    "KM",
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5,
+                                      color: _RouteAccent.teal,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
                         ),
-                      )
-                    else
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: scheme.surfaceContainerHighest.withValues(alpha: 0.9),
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: border),
-                        ),
-                        child: Text(
-                          'Past month',
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: scheme.onSurfaceVariant,
-                            letterSpacing: 0.2,
+
+                        const SizedBox(width: 16),
+
+                        // Live Badge Details
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                "Total Distance",
+                                style: GoogleFonts.inter(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: scheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: Text(
+                                  "GPS sessions & synced visits recorded for this period.",
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    height: 1.3,
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                  ],
-                ),
-              ),
-
-              // Metric well — inset “instrument” panel + count-up (unchanged animation)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        _RouteAccent.teal.withValues(alpha: 0.07),
-                        _RouteAccent.cyan.withValues(alpha: 0.05),
-                        scheme.surfaceContainerLow.withValues(alpha: 0.92),
                       ],
                     ),
-                    border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.42)),
                   ),
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        left: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: 4,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: const BorderRadius.horizontal(
-                              left: Radius.circular(19),
-                            ),
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                _RouteAccent.teal,
-                                _RouteAccent.cyan,
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(22, 22, 20, 20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Total this period',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: _RouteAccent.deep.withValues(alpha: 0.85),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            TweenAnimationBuilder<double>(
-                              key: ValueKey<String>(animKey),
-                              tween: Tween(begin: 0, end: km),
-                              duration: const Duration(milliseconds: 1600),
-                              curve: Curves.easeOutCubic,
-                              builder: (context, value, _) {
-                                return Row(
-                                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                                  textBaseline: TextBaseline.alphabetic,
-                                  children: [
-                                    Flexible(
-                                      child: FittedBox(
-                                        fit: BoxFit.scaleDown,
-                                        alignment: Alignment.centerLeft,
-                                        child: ShaderMask(
-                                          blendMode: BlendMode.srcIn,
-                                          shaderCallback: (bounds) {
-                                            return LinearGradient(
-                                              begin: Alignment.topLeft,
-                                              end: Alignment.bottomRight,
-                                              colors: [
-                                                _RouteAccent.deep,
-                                                _RouteAccent.teal,
-                                                _RouteAccent.cyan,
-                                              ],
-                                            ).createShader(
-                                              Rect.fromLTWH(0, 0, bounds.width, bounds.height),
-                                            );
-                                          },
-                                          child: Text(
-                                            _formatKmValue(value),
-                                            style: GoogleFonts.inter(
-                                              fontSize: 52,
-                                              fontWeight: FontWeight.w900,
-                                              height: 1.0,
-                                              letterSpacing: -2.2,
-                                              color: Colors.white,
-                                              fontFeatures: const [
-                                                FontFeature.tabularFigures(),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Padding(
-                                      padding: const EdgeInsets.only(bottom: 8),
-                                      child: Text(
-                                        'km',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.w700,
-                                          color: _RouteAccent.deep.withValues(alpha: 0.55),
-                                          letterSpacing: 0.5,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'GPS sessions and synced visits in the date range above.',
-                              style: GoogleFonts.inter(
-                                fontSize: 12,
-                                height: 1.4,
-                                fontWeight: FontWeight.w500,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
 
-              // KPI strip — equal cells, standard dashboard footer
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: _RouteAccent.teal.withValues(alpha: 0.04),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: _RouteAccent.teal.withValues(alpha: 0.18)),
+                  // HomeMonthPicker Positioned at Top Right inside Container
+                  const Positioned(
+                    top: 8,
+                    right: 8,
+                    child: HomeMonthPicker(),
                   ),
-                  child: Row(
-                    children: [
-                      _StatCell(
-                        icon: Icons.place_rounded,
-                        value: '${t.visits}',
-                        label: 'Visits',
-                        scheme: scheme,
-                        iconColor: _RouteAccent.visits,
-                        showLeftDivider: false,
-                      ),
-                      _StatCell(
-                        icon: Icons.flag_rounded,
-                        value: '${t.newVisits}',
-                        label: 'New',
-                        scheme: scheme,
-                        iconColor: _RouteAccent.fresh,
-                        showLeftDivider: true,
-                      ),
-                      _StatCell(
-                        icon: Icons.reply_rounded,
-                        value: '${t.followupVisits}',
-                        label: 'F/U',
-                        scheme: scheme,
-                        iconColor: _RouteAccent.follow,
-                        showLeftDivider: true,
-                      ),
-                      _StatCell(
-                        icon: Icons.timer_outlined,
-                        value: '${t.productiveHours.toStringAsFixed(1)}h',
-                        label: 'Field',
-                        scheme: scheme,
-                        iconColor: _RouteAccent.teal,
-                        showLeftDivider: true,
-                      ),
-                    ],
-                  ),
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+
+            // Grid View with Stats
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: GridView.count(
+                physics: const NeverScrollableScrollPhysics(),
+                shrinkWrap: true,
+                crossAxisCount: 2,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: 2.3,
+                children: [
+                  _DashboardTile(
+                    title: "Visits",
+                    value: "${t.visits}",
+                    icon: Icons.location_on_rounded,
+                    color: _RouteAccent.visits,
+                  ),
+                  _DashboardTile(
+                    title: "New",
+                    value: "${t.newVisits}",
+                    icon: Icons.flag_rounded,
+                    color: _RouteAccent.fresh,
+                  ),
+                  _DashboardTile(
+                    title: "Follow Up",
+                    value: "${t.followupVisits}",
+                    icon: Icons.reply_rounded,
+                    color: _RouteAccent.follow,
+                  ),
+                  _DashboardTile(
+                    title: "Field Hours",
+                    value: "${t.productiveHours.toStringAsFixed(1)}h",
+                    icon: Icons.timer_rounded,
+                    color: _RouteAccent.teal,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
+      ),
     );
   }
 }
 
-class _StatCell extends StatelessWidget {
-  const _StatCell({
-    required this.icon,
+class _DashboardTile extends StatelessWidget {
+  const _DashboardTile({
+    required this.title,
     required this.value,
-    required this.label,
-    required this.scheme,
-    required this.iconColor,
-    required this.showLeftDivider,
+    required this.icon,
+    required this.color,
   });
 
-  final IconData icon;
+  final String title;
   final String value;
-  final String label;
-  final ColorScheme scheme;
-  final Color iconColor;
-  final bool showLeftDivider;
+  final IconData icon;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final border = Color.lerp(_RouteAccent.teal, scheme.outlineVariant, 0.65)!
-        .withValues(alpha: 0.45);
-    return Expanded(
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: showLeftDivider
-              ? Border(left: BorderSide(color: border))
-              : null,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
-          child: Column(
-            children: [
-              Icon(icon, size: 18, color: iconColor),
-              const SizedBox(height: 6),
-              Text(
-                value,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.35,
-                  fontFeatures: const [FontFeature.tabularFigures()],
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                  color: scheme.onSurfaceVariant,
-                  letterSpacing: 0.2,
-                ),
-              ),
-            ],
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: 20),
           ),
-        ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    value,
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
+                      color: scheme.onSurface,
+                    ),
+                  ),
+                ),
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

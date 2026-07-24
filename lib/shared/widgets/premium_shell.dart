@@ -288,17 +288,21 @@ class PremiumStatusPill extends StatelessWidget {
 }
 
 /// Frosted app bar (new_hrms-style) with optional drawer menu.
-class SalesGlassAppBar extends StatelessWidget implements PreferredSizeWidget {
+/// Frosted app bar (new_hrms-style) with optional drawer menu.
+class SalesGlassAppBar extends StatelessWidget
+    implements PreferredSizeWidget {
   const SalesGlassAppBar({
     super.key,
-    required this.title,
+    this.title,
+    this.titleWidget,
     this.actions,
     this.showDrawer = false,
     this.showBack = false,
     this.showNotificationAction = true,
   });
 
-  final String title;
+  final String? title;
+  final Widget? titleWidget;
   final List<Widget>? actions;
   final bool showDrawer;
   final bool showBack;
@@ -310,6 +314,7 @@ class SalesGlassAppBar extends StatelessWidget implements PreferredSizeWidget {
 
     Widget? leading;
     double? leadingWidth;
+
     if (showDrawer && showBack) {
       leadingWidth = 112;
       leading = Row(
@@ -332,12 +337,14 @@ class SalesGlassAppBar extends StatelessWidget implements PreferredSizeWidget {
     } else if (showDrawer) {
       leading = Builder(
         builder: (ctx) => IconButton(
+          tooltip: 'Menu',
           icon: const Icon(Icons.menu_rounded),
           onPressed: () => Scaffold.of(ctx).openDrawer(),
         ),
       );
     } else if (showBack) {
       leading = IconButton(
+        tooltip: 'Back',
         icon: const Icon(Icons.arrow_back_rounded),
         onPressed: () => Navigator.of(context).maybePop(),
       );
@@ -350,7 +357,10 @@ class SalesGlassAppBar extends StatelessWidget implements PreferredSizeWidget {
 
     return ClipRect(
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        filter: ImageFilter.blur(
+          sigmaX: 12,
+          sigmaY: 12,
+        ),
         child: AppBar(
           elevation: 0,
           backgroundColor: scheme.surface.withValues(alpha: 0.55),
@@ -360,14 +370,20 @@ class SalesGlassAppBar extends StatelessWidget implements PreferredSizeWidget {
           shadowColor: Colors.transparent,
           leading: leading,
           leadingWidth: leadingWidth,
-          title: Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              letterSpacing: -.2,
-            ),
-          ),
+
+          titleSpacing: 0,
+
+          title: titleWidget ??
+              Text(
+                title ?? '',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -.2,
+                ),
+              ),
+
           actions: mergedActions,
+
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(1),
             child: Container(

@@ -1,366 +1,394 @@
 import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../../data/models/home_models.dart';
 
-/// Matches distance hero accents for a cohesive dashboard.
 abstract final class _LiveCardAccent {
   static const Color teal = Color(0xFF0D9488);
   static const Color cyan = Color(0xFF0891B2);
-  static const Color deep = Color(0xFF0F766E);
   static const Color amber = Color(0xFFF59E0B);
-  static const Color slate = Color(0xFF64748B);
+  static const Color liveGreen = Color(0xFF10B981);
 }
 
-class HomeLiveTrackingCard extends StatelessWidget {
+class HomeLiveTrackingCard extends StatefulWidget {
   const HomeLiveTrackingCard({super.key, required this.live});
 
   final TrackingLiveSummary live;
 
   @override
+  State<HomeLiveTrackingCard> createState() => _HomeLiveTrackingCardState();
+}
+
+class _HomeLiveTrackingCardState extends State<HomeLiveTrackingCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+
+    _pulseAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final isLive = widget.live.isLive && widget.live.sessionId != null;
 
-    if (!live.isLive || live.sessionId == null) {
-      return ClipRRect(
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: scheme.surface,
         borderRadius: BorderRadius.circular(24),
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                _LiveCardAccent.teal.withValues(alpha: 0.1),
-                _LiveCardAccent.cyan.withValues(alpha: 0.06),
-                scheme.surface,
-              ],
-            ),
-            border: Border.all(color: _LiveCardAccent.teal.withValues(alpha: 0.22)),
-            boxShadow: [
-              BoxShadow(
-                color: _LiveCardAccent.teal.withValues(alpha: 0.1),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
+        border: Border.all(
+          color: isLive
+              ? _LiveCardAccent.liveGreen.withValues(alpha: 0.3)
+              : scheme.outlineVariant.withValues(alpha: 0.3),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: isLive
+                ? _LiveCardAccent.liveGreen.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.03),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
           ),
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                right: -12,
-                top: -8,
-                child: Icon(
-                  Icons.my_location_rounded,
-                  size: 96,
-                  color: _LiveCardAccent.teal.withValues(alpha: 0.07),
-                ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
+          children: [
+            // Background Decorative Watermark Icon
+            Positioned(
+              right: -24,
+              bottom: -24,
+              child: Icon(
+                isLive ? Icons.navigation_rounded : Icons.map_rounded,
+                size: 160,
+                color: (isLive ? _LiveCardAccent.liveGreen : _LiveCardAccent.teal)
+                    .withValues(alpha: 0.04),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    DecoratedBox(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(18),
-                        gradient: const LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            _LiveCardAccent.teal,
-                            _LiveCardAccent.cyan,
-                          ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: _LiveCardAccent.teal.withValues(alpha: 0.35),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(2.5),
-                        child: Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: scheme.surface,
-                            borderRadius: BorderRadius.circular(15.5),
-                          ),
-                          child: Icon(
-                            Icons.route_rounded,
-                            size: 28,
-                            color: _LiveCardAccent.deep,
-                          ),
-                        ),
-                      ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: isLive
+                  ? _buildLiveState(context, scheme)
+                  : _buildIdleState(context, scheme),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // ACTIVE / LIVE STATE
+  // ---------------------------------------------------------------------------
+  Widget _buildLiveState(BuildContext context, ColorScheme scheme) {
+    final hb = widget.live.lastHeartbeatAt;
+    final hbStr = hb != null ? DateFormat('h:mm a').format(hb.toLocal()) : '—';
+    final startTimeStr = widget.live.checkInAt != null
+        ? DateFormat('EEE, MMM d · h:mm a').format(widget.live.checkInAt!.toLocal())
+        : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header Row: Pulsing Indicator + Main Title
+        Row(
+          children: [
+            _buildLiveBadge(),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Session in Progress',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.onSurface,
+                      letterSpacing: -0.3,
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: _LiveCardAccent.amber.withValues(alpha: 0.14),
-                                  borderRadius: BorderRadius.circular(999),
-                                  border: Border.all(
-                                    color: _LiveCardAccent.amber.withValues(alpha: 0.35),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 6,
-                                      height: 6,
-                                      decoration: const BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: _LiveCardAccent.amber,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'STANDBY',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w900,
-                                        letterSpacing: 0.9,
-                                        color: _LiveCardAccent.deep,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            'Tracking idle',
-                            style: GoogleFonts.inter(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.4,
-                              color: scheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: Icon(
-                                  Icons.touch_app_rounded,
-                                  size: 18,
-                                  color: _LiveCardAccent.teal,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  'Open Daily tracking and check in to record live route distance and session km.',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12.5,
-                                    height: 1.45,
-                                    fontWeight: FontWeight.w500,
-                                    color: scheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.info_outline_rounded,
-                                size: 16,
-                                color: _LiveCardAccent.slate.withValues(alpha: 0.85),
-                              ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  'No active GPS session · your month-to-date totals still update from saved visits.',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11,
-                                    height: 1.35,
-                                    fontWeight: FontWeight.w600,
-                                    color: _LiveCardAccent.slate.withValues(alpha: 0.9),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                  ),
+                  if (startTimeStr != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Started $startTimeStr',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        color: scheme.onSurfaceVariant,
                       ),
                     ),
                   ],
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+
+        // Key Metrics Row
+        Row(
+          children: [
+            Expanded(
+              child: _buildMetricTile(
+                scheme: scheme,
+                icon: Icons.straighten_rounded,
+                iconColor: _LiveCardAccent.cyan,
+                label: 'DISTANCE',
+                value: '${widget.live.totalDistanceKm.toStringAsFixed(2)} km',
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildMetricTile(
+                scheme: scheme,
+                icon: Icons.favorite_rounded,
+                iconColor: _LiveCardAccent.liveGreen,
+                label: 'LAST PULSE',
+                value: hbStr,
+              ),
+            ),
+          ],
+        ),
+
+        // Location Warning Banner
+        if (widget.live.locationOffReason != null &&
+            widget.live.locationOffReason!.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: scheme.errorContainer.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: scheme.error.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  size: 16,
+                  color: scheme.error,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.live.locationOffReason!,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.onErrorContainer,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // IDLE / STANDBY STATE
+  // ---------------------------------------------------------------------------
+  Widget _buildIdleState(BuildContext context, ColorScheme scheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // Standby Pill
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: _LiveCardAccent.amber.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _LiveCardAccent.amber.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: _LiveCardAccent.amber,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'STANDBY',
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.8,
+                      color: _LiveCardAccent.amber,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.sensors_off_rounded,
+              size: 20,
+              color: scheme.onSurfaceVariant.withValues(alpha: 0.4),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Tracking Idle',
+          style: GoogleFonts.inter(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: scheme.onSurface,
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Check in to start recording your live route and distance.',
+          style: GoogleFonts.inter(
+            fontSize: 13,
+            height: 1.4,
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.info_outline_rounded,
+                size: 16,
+                color: scheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Month-to-date totals auto-update from saved visits.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
           ),
         ),
-      );
-    }
+      ],
+    );
+  }
 
-    final hb = live.lastHeartbeatAt;
-    final hbStr = hb != null ? DateFormat('MMM d, h:mm a').format(hb.toLocal()) : '—';
+  // ---------------------------------------------------------------------------
+  // HELPER WIDGETS
+  // ---------------------------------------------------------------------------
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: Stack(
-        clipBehavior: Clip.hardEdge,
+  /// Pulsing LIVE Pill
+  Widget _buildLiveBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: _LiveCardAccent.liveGreen,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: scheme.surface.withValues(alpha: 0.52),
-                  border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.4)),
-                ),
+          FadeTransition(
+            opacity: _pulseAnimation,
+            child: Container(
+              width: 7,
+              height: 7,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.white,
               ),
             ),
           ),
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    const Color(0xFF059669).withValues(alpha: 0.14),
-                    scheme.primaryContainer.withValues(alpha: 0.28),
-                    scheme.surface.withValues(alpha: 0.15),
-                  ],
-                ),
-              ),
+          const SizedBox(width: 6),
+          Text(
+            'LIVE',
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: 0.8,
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF059669),
-                        borderRadius: BorderRadius.circular(22),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF059669).withValues(alpha: 0.45),
-                            blurRadius: 12,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(width: 7),
-                          Text(
-                            'LIVE',
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w900,
-                              color: Colors.white,
-                              letterSpacing: 0.9,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      '${live.totalDistanceKm.toStringAsFixed(2)} km',
-                      style: GoogleFonts.inter(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
-                        color: scheme.onSurface,
-                      ),
-                    ),
-                  ],
+        ],
+      ),
+    );
+  }
+
+  /// Metric Card Tile
+  Widget _buildMetricTile({
+    required ColorScheme scheme,
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 14, color: iconColor),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.6,
+                  color: scheme.onSurfaceVariant,
                 ),
-                const SizedBox(height: 14),
-                Text(
-                  'Session in progress',
-                  style: GoogleFonts.inter(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                if (live.checkInAt != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    'Since ${DateFormat('EEE, MMM d · h:mm a').format(live.checkInAt!.toLocal())}',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: scheme.surface.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.35)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.favorite_border_rounded, size: 18, color: scheme.primary),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Last pulse $hbStr',
-                          style: GoogleFonts.inter(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (live.locationOffReason != null && live.locationOffReason!.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    'Location: ${live.locationOffReason}',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: scheme.error,
-                    ),
-                  ),
-                ],
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.4,
+              color: scheme.onSurface,
             ),
           ),
         ],

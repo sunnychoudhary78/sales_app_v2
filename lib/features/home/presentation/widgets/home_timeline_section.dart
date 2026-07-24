@@ -5,16 +5,13 @@ import 'package:intl/intl.dart';
 import '../../data/models/home_models.dart';
 import 'home_dashboard_chrome.dart';
 
-/// Premium stream accents — stable across themes, matches field-tracking vibe.
-abstract final class _StreamAccent {
-  static const Color teal = Color(0xFF0D9488);
-  static const Color cyan = Color(0xFF0891B2);
-  static const Color live = Color(0xFF059669);
-  static const Color violet = Color(0xFF7C3AED);
-  static const Color amber = Color(0xFFD97706);
-  static const Color slate = Color(0xFF64748B);
-  static const Color ink = Color(0xFF0F172A);
-  static const Color spine = Color(0xFF94A3B8);
+/// Refined Color System for High Contrast & Modern Feel
+abstract final class _TimelineTheme {
+  static const Color visitNew = Color(0xFFD97706); // Amber
+  static const Color visitFollowUp = Color(0xFF8B5CF6); // Purple
+  static const Color checkIn = Color(0xFF10B981); // Emerald
+  static const Color checkOut = Color(0xFF64748B); // Slate
+  static const Color defaultAccent = Color(0xFF06B6D4); // Cyan
 }
 
 class HomeTimelineSection extends StatelessWidget {
@@ -26,110 +23,64 @@ class HomeTimelineSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
 
-    if (events.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-        decoration: HomeDashboardChrome.panelDecoration(scheme),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            HomeDashboardChrome.sectionHeader(
-              context,
-              eyebrow: 'Log',
-              title: 'Activity stream',
-              subtitle: 'Check-ins, visits, and session summaries appear here.',
-              icon: Icons.timeline_rounded,
-            ),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
-              decoration: BoxDecoration(
-                color: scheme.surfaceContainerLow.withValues(alpha: 0.55),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: scheme.outlineVariant.withValues(alpha: 0.32),
-                ),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.podcasts_rounded,
-                    size: 36,
-                    color: _StreamAccent.teal.withValues(alpha: 0.45),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'No activity yet',
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.2,
-                      color: scheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Start a session or log a visit — your stream will show up here.',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
-                      fontSize: 12.5,
-                      height: 1.4,
-                      fontWeight: FontWeight.w500,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final shown =
-        events.length > 12 ? events.sublist(events.length - 12) : events;
-    final list = shown.reversed.take(8).toList();
-
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      padding: const EdgeInsets.all(20),
       decoration: HomeDashboardChrome.panelDecoration(scheme),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           HomeDashboardChrome.sectionHeader(
             context,
-            eyebrow: 'Log',
-            title: 'Activity stream',
-            subtitle: 'Latest check-ins, visits, and session ends from your account.',
+            eyebrow: 'LOG',
+            title: 'Activity Stream',
+            subtitle: events.isEmpty
+                ? 'Check-ins, visits, and session summaries appear here.'
+                : 'Latest check-ins, visits, and session activity.',
             icon: Icons.timeline_rounded,
           ),
-          const SizedBox(height: 4),
-          ...list.asMap().entries.map((e) {
-            final i = e.key;
-            final ev = e.value;
-            final isFirst = i == 0;
-            final isLast = i == list.length - 1;
-            return Padding(
-              padding: EdgeInsets.only(bottom: isLast ? 0 : 2),
-              child: _TimelineRow(
-                event: ev,
-                scheme: scheme,
-                isFirst: isFirst,
-                isLast: isLast,
-              ),
-            );
-          }),
+          const SizedBox(height: 20),
+          if (events.isEmpty)
+            _EmptyStateView(scheme: scheme)
+          else
+            _TimelineListView(events: events, scheme: scheme),
         ],
       ),
     );
   }
 }
 
-class _TimelineRow extends StatelessWidget {
-  const _TimelineRow({
+class _TimelineListView extends StatelessWidget {
+  const _TimelineListView({required this.events, required this.scheme});
+
+  final List<TimelineEvent> events;
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final shown =
+        events.length > 12 ? events.sublist(events.length - 12) : events;
+    final list = shown.reversed.take(8).toList();
+
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: list.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      itemBuilder: (context, index) {
+        return _TimelineTile(
+          event: list[index],
+          scheme: scheme,
+          isFirst: index == 0,
+          isLast: index == list.length - 1,
+        );
+      },
+    );
+  }
+}
+
+class _TimelineTile extends StatelessWidget {
+  const _TimelineTile({
     required this.event,
     required this.scheme,
     required this.isFirst,
@@ -143,37 +94,23 @@ class _TimelineRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = _eventStyle(event);
-    final spineColor = _StreamAccent.spine.withValues(alpha: 0.35);
+    final style = _getEventStyle(event);
 
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Timeline Node & Line Segment
           SizedBox(
-            width: 22,
+            width: 28,
             child: Column(
               children: [
                 Expanded(
-                  child: Center(
-                    child: Container(
-                      width: 2,
-                      margin: const EdgeInsets.only(bottom: 2),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(2),
-                        gradient: isFirst
-                            ? null
-                            : LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  spineColor.withValues(alpha: 0.15),
-                                  spineColor,
-                                ],
-                              ),
-                        color: isFirst ? Colors.transparent : null,
-                      ),
-                    ),
+                  child: Container(
+                    width: 2,
+                    color: isFirst
+                        ? Colors.transparent
+                        : scheme.outlineVariant.withValues(alpha: 0.3),
                   ),
                 ),
                 Container(
@@ -181,48 +118,37 @@ class _TimelineRow extends StatelessWidget {
                   height: 12,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: scheme.surface,
-                    border: Border.all(
-                      color: style.accent,
-                      width: 2.5,
-                    ),
+                    color: style.accent,
+                    // Note: Glow here is minimal and part of the node design,
+                    // not the card. Keeping it for visual clarity of the event type.
                     boxShadow: [
                       BoxShadow(
-                        color: style.accent.withValues(alpha: 0.35),
+                        color: style.accent.withValues(alpha: 0.4),
                         blurRadius: 8,
-                        offset: const Offset(0, 2),
+                        spreadRadius: 2,
                       ),
                     ],
                   ),
                 ),
                 Expanded(
-                  child: Center(
-                    child: Container(
-                      width: 2,
-                      margin: const EdgeInsets.only(top: 2),
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(2),
-                        gradient: isLast
-                            ? null
-                            : LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  spineColor,
-                                  spineColor.withValues(alpha: 0.2),
-                                ],
-                              ),
-                        color: isLast ? Colors.transparent : null,
-                      ),
-                    ),
+                  child: Container(
+                    width: 2,
+                    color: isLast
+                        ? Colors.transparent
+                        : scheme.outlineVariant.withValues(alpha: 0.3),
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(width: 12),
+          // Event Content Card
           Expanded(
-            child: _TimelineCard(event: event, scheme: scheme, style: style),
+            child: _ModernEventCard(
+              event: event,
+              scheme: scheme,
+              style: style,
+            ),
           ),
         ],
       ),
@@ -230,58 +156,8 @@ class _TimelineRow extends StatelessWidget {
   }
 }
 
-class _EventVisual {
-  const _EventVisual({
-    required this.icon,
-    required this.accent,
-    required this.iconBgTop,
-    required this.iconBgBottom,
-  });
-
-  final IconData icon;
-  final Color accent;
-  final Color iconBgTop;
-  final Color iconBgBottom;
-}
-
-_EventVisual _eventStyle(TimelineEvent event) {
-  if (event.isVisit) {
-    final isNew = event.meta['is_new_visit'] == true;
-    return _EventVisual(
-      icon: Icons.storefront_rounded,
-      accent: isNew ? _StreamAccent.amber : _StreamAccent.violet,
-      iconBgTop: (isNew ? _StreamAccent.amber : _StreamAccent.violet)
-          .withValues(alpha: 0.22),
-      iconBgBottom: (isNew ? _StreamAccent.amber : _StreamAccent.violet)
-          .withValues(alpha: 0.08),
-    );
-  }
-  if (event.isCheckIn) {
-    return _EventVisual(
-      icon: Icons.play_circle_filled_rounded,
-      accent: _StreamAccent.live,
-      iconBgTop: _StreamAccent.live.withValues(alpha: 0.2),
-      iconBgBottom: _StreamAccent.teal.withValues(alpha: 0.08),
-    );
-  }
-  if (event.isCheckOut) {
-    return _EventVisual(
-      icon: Icons.stop_circle_rounded,
-      accent: _StreamAccent.slate,
-      iconBgTop: _StreamAccent.slate.withValues(alpha: 0.18),
-      iconBgBottom: _StreamAccent.cyan.withValues(alpha: 0.06),
-    );
-  }
-  return _EventVisual(
-    icon: Icons.circle_outlined,
-    accent: _StreamAccent.cyan,
-    iconBgTop: _StreamAccent.cyan.withValues(alpha: 0.18),
-    iconBgBottom: _StreamAccent.teal.withValues(alpha: 0.06),
-  );
-}
-
-class _TimelineCard extends StatelessWidget {
-  const _TimelineCard({
+class _ModernEventCard extends StatelessWidget {
+  const _ModernEventCard({
     required this.event,
     required this.scheme,
     required this.style,
@@ -289,198 +165,294 @@ class _TimelineCard extends StatelessWidget {
 
   final TimelineEvent event;
   final ColorScheme scheme;
-  final _EventVisual style;
+  final _EventStyle style;
 
   @override
   Widget build(BuildContext context) {
-    final time = DateFormat('MMM d · h:mm a').format(event.at.toLocal());
-    final subtitle = event.isVisit && event.meta['is_new_visit'] == true
-        ? 'New visit'
-        : event.isVisit
-            ? 'Follow-up'
-            : (event.isCheckIn
-                ? 'Start tracking'
-                : (event.isCheckOut ? 'End tracking' : event.type));
-
-    final chipBg = style.accent.withValues(alpha: 0.12);
-    final chipBorder = style.accent.withValues(alpha: 0.28);
+    final timeStr = DateFormat('MMM d · h:mm a').format(event.at.toLocal());
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return Container(
       decoration: BoxDecoration(
-        color: scheme.surface.withValues(alpha: 0.88),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: scheme.outlineVariant.withValues(alpha: 0.34),
-        ),
+        borderRadius: BorderRadius.circular(16),
+        // Simplified ambient shadow, no accent glow
         boxShadow: [
           BoxShadow(
-            color: scheme.shadow.withValues(alpha: 0.05),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-          BoxShadow(
-            color: style.accent.withValues(alpha: 0.07),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: isDark ? 0.1 : 0.04),
+            blurRadius: isDark ? 12 : 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                width: 4,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      style.accent,
-                      Color.lerp(style.accent, _StreamAccent.teal, 0.35) ??
-                          style.accent,
-                    ],
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          decoration: BoxDecoration(
+            // Soft Gradient Surface Background adapted for theme
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                scheme.surfaceContainerHigh
+                    .withValues(alpha: isDark ? 0.9 : 0.7),
+                scheme.surfaceContainerLow.withValues(alpha: isDark ? 0.6 : 0.4),
+              ],
+            ),
+            border: Border.all(
+              color: scheme.outlineVariant
+                  .withValues(alpha: isDark ? 0.15 : 0.25),
+            ),
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              children: [
+                // Minimalist Left Accent Bar (Glow Removed)
+                Container(
+                  width: 4,
+                  decoration: BoxDecoration(
+                    color: style.accent,
                   ),
                 ),
-              ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 13, 14, 13),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(14),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [style.iconBgTop, style.iconBgBottom],
+                // Main Content Body
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Icon Container (Adapted for theme, glow removed)
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: style.accent
+                                .withValues(alpha: isDark ? 0.15 : 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: style.accent
+                                  .withValues(alpha: isDark ? 0.3 : 0.2),
+                            ),
                           ),
-                          border: Border.all(
-                            color: style.accent.withValues(alpha: 0.25),
+                          child: Icon(
+                            style.icon,
+                            color: style.accent,
+                            size: 20,
                           ),
                         ),
-                        child: Icon(style.icon, color: style.accent, size: 24),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              event.label,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.28,
-                                height: 1.25,
-                                color: scheme.onSurface,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 6,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.schedule_rounded,
-                                      size: 13,
-                                      color: scheme.onSurfaceVariant
-                                          .withValues(alpha: 0.85),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      time,
+                        const SizedBox(width: 12),
+                        // Details Column
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      event.label,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: GoogleFonts.inter(
-                                        fontSize: 11.5,
+                                        fontSize: 14,
                                         fontWeight: FontWeight.w600,
-                                        color: scheme.onSurfaceVariant,
+                                        color: scheme.onSurface,
                                       ),
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  _StatusBadge(
+                                    label: style.badgeLabel,
+                                    color: style.accent,
+                                    isDark: isDark,
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.access_time_rounded,
+                                    size: 13,
+                                    color: scheme.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    timeStr,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w500,
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              if (event.isCheckOut &&
+                                  event.meta['total_distance_km'] != null) ...[
+                                const SizedBox(height: 10),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 10,
                                     vertical: 4,
-                                  ),
+                                 ),
                                   decoration: BoxDecoration(
-                                    color: chipBg,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: chipBorder),
-                                  ),
-                                  child: Text(
-                                    subtitle,
-                                    style: GoogleFonts.inter(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.2,
-                                      color: style.accent,
+                                    color: scheme.surfaceContainerHighest
+                                        .withValues(alpha: 0.5),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: scheme.outlineVariant.withValues(
+                                          alpha: isDark ? 0.1 : 0.2),
                                     ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.directions_walk_rounded,
+                                        size: 14,
+                                        color: style.accent,
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '${event.meta['total_distance_km']} km covered',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: scheme.onSurface,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
-                            ),
-                            if (event.isCheckOut &&
-                                event.meta['total_distance_km'] != null) ...[
-                              const SizedBox(height: 10),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 7,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _StreamAccent.teal.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: _StreamAccent.cyan
-                                        .withValues(alpha: 0.28),
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.straighten_rounded,
-                                      size: 15,
-                                      color: _StreamAccent.teal,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Session · ${event.meta['total_distance_km']} km',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12.5,
-                                        fontWeight: FontWeight.w800,
-                                        color: _StreamAccent.ink
-                                            .withValues(alpha: 0.88),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
                             ],
-                          ],
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({
+    required this.label,
+    required this.color,
+    required this.isDark,
+  });
+
+  final String label;
+  final Color color;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: isDark ? 0.15 : 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: isDark ? 0.3 : 0.25)),
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: GoogleFonts.inter(
+          fontSize: 9.5,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+          color: color,
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyStateView extends StatelessWidget {
+  const _EmptyStateView({required this.scheme});
+
+  final ColorScheme scheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow.withValues(alpha: isDark ? 0.6 : 0.4),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: isDark ? 0.1 : 0.2),
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.history_toggle_off_rounded,
+            size: 36,
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'No recent activity',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: scheme.onSurface,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EventStyle {
+  const _EventStyle({
+    required this.icon,
+    required this.accent,
+    required this.badgeLabel,
+  });
+
+  final IconData icon;
+  final Color accent;
+  final String badgeLabel;
+}
+
+_EventStyle _getEventStyle(TimelineEvent event) {
+  if (event.isVisit) {
+    final isNew = event.meta['is_new_visit'] == true;
+    return _EventStyle(
+      icon: Icons.storefront_rounded,
+      accent: isNew ? _TimelineTheme.visitNew : _TimelineTheme.visitFollowUp,
+      badgeLabel: isNew ? 'New Visit' : 'Follow-up',
+    );
+  }
+  if (event.isCheckIn) {
+    return const _EventStyle(
+      icon: Icons.login_rounded,
+      accent: _TimelineTheme.checkIn,
+      badgeLabel: 'Check-In',
+    );
+  }
+  if (event.isCheckOut) {
+    return const _EventStyle(
+      icon: Icons.logout_rounded,
+      accent: _TimelineTheme.checkOut,
+      badgeLabel: 'Check-Out',
+    );
+  }
+  return _EventStyle(
+    icon: Icons.notifications_active_rounded,
+    accent: _TimelineTheme.defaultAccent,
+    badgeLabel: event.type,
+  );
 }

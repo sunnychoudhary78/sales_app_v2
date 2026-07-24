@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 
 import '../providers/home_dashboard_provider.dart';
 
-/// Header action: pick one of the last 12 calendar months for home metrics.
 class HomeMonthPicker extends ConsumerWidget {
   const HomeMonthPicker({super.key});
 
@@ -23,7 +23,7 @@ class HomeMonthPicker extends ConsumerWidget {
     return DateFormat('MMM yyyy').format(selected);
   }
 
-  static bool _isCurrentMonthSelected(DateTime? selected) {
+  static bool isCurrentMonthSelected(DateTime? selected) {
     return selected == null || HomeDashboardNotifier.isCurrentMonthMtd(selected);
   }
 
@@ -37,6 +37,8 @@ class HomeMonthPicker extends ConsumerWidget {
 
     return PopupMenuButton<DateTime>(
       tooltip: 'Select month',
+      offset: const Offset(0, 36),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       onSelected: (value) {
         ref.read(homeSelectedMonthProvider.notifier).setMonth(value);
         ref.invalidate(homeDashboardProvider);
@@ -46,8 +48,9 @@ class HomeMonthPicker extends ConsumerWidget {
           value: currentMonthAnchor,
           child: Text(
             'This month (to date)',
-            style: TextStyle(
-              fontWeight: _isCurrentMonthSelected(selected)
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: isCurrentMonthSelected(selected)
                   ? FontWeight.w700
                   : FontWeight.w500,
             ),
@@ -57,7 +60,7 @@ class HomeMonthPicker extends ConsumerWidget {
         ...months.map((m) {
           final isCurrent = m.year == now.year && m.month == now.month;
           final isSelected = isCurrent
-              ? _isCurrentMonthSelected(selected)
+              ? isCurrentMonthSelected(selected)
               : selected != null &&
                   selected.year == m.year &&
                   selected.month == m.month;
@@ -68,39 +71,47 @@ class HomeMonthPicker extends ConsumerWidget {
             value: m,
             child: Text(
               label,
-              style: TextStyle(
+              style: GoogleFonts.inter(
+                fontSize: 13,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               ),
             ),
           );
         }),
       ],
-      child: Padding(
-        padding: const EdgeInsets.only(right: 4),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: scheme.surfaceContainerHighest.withValues(alpha: 0.85),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: scheme.outlineVariant.withValues(alpha: 0.4),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.calendar_month_rounded, size: 18, color: scheme.primary),
-              const SizedBox(width: 6),
-              Text(
-                labelForMonth(selected),
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: scheme.onSurface,
-                ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.calendar_month_rounded,
+              size: 14,
+              color: scheme.primary,
+            ),
+            const SizedBox(width: 5),
+            Text(
+              labelForMonth(selected),
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: scheme.onSurface,
               ),
-              const SizedBox(width: 2),
-              Icon(Icons.arrow_drop_down_rounded, size: 20, color: scheme.onSurfaceVariant),
-            ],
-          ),
+            ),
+            const SizedBox(width: 2),
+            Icon(
+              Icons.arrow_drop_down_rounded,
+              size: 18,
+              color: scheme.onSurfaceVariant,
+            ),
+          ],
         ),
       ),
     );

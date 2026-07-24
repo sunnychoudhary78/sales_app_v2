@@ -36,63 +36,28 @@ String _visitSaveErrorMessage(Object error) {
 }
 
 const _indianStates = <String>[
-  'Andhra Pradesh',
-  'Arunachal Pradesh',
-  'Assam',
-  'Bihar',
-  'Chhattisgarh',
-  'Goa',
-  'Gujarat',
-  'Haryana',
-  'Himachal Pradesh',
-  'Jharkhand',
-  'Karnataka',
-  'Kerala',
-  'Madhya Pradesh',
-  'Maharashtra',
-  'Manipur',
-  'Meghalaya',
-  'Mizoram',
-  'Nagaland',
-  'Odisha',
-  'Punjab',
-  'Rajasthan',
-  'Sikkim',
-  'Tamil Nadu',
-  'Telangana',
-  'Tripura',
-  'Uttar Pradesh',
-  'Uttarakhand',
-  'West Bengal',
-  'Delhi',
-  'Jammu and Kashmir',
-  'Ladakh',
-  'Puducherry',
+  'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh',
+  'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka',
+  'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 'Mizoram',
+  'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu',
+  'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal',
+  'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Puducherry',
 ];
 
-/// Same wording as legacy Sales App rating dropdown.
 const _ratingLabels = <String>[
-  '',
-  'Not intrested',
-  'Less quantity, Rate OK',
-  'Medium Qty, Rate NG',
-  'High Qty, Rate NG',
-  'Neutral',
-  'Qty OK, Rate OK, Vendor not changing',
-  'Order more then 45 Days',
-  'Order more then 15 Days',
-  'Order Within 15 Days',
+  '', 'Not intrested', 'Less quantity, Rate OK', 'Medium Qty, Rate NG',
+  'High Qty, Rate NG', 'Neutral', 'Qty OK, Rate OK, Vendor not changing',
+  'Order more then 45 Days', 'Order more then 15 Days', 'Order Within 15 Days',
   'Instant Order',
 ];
 
-String _ratingLabelFor(int r) =>
-    (r >= 1 && r <= 10) ? _ratingLabels[r] : '';
+String _ratingLabelFor(int r) => (r >= 1 && r <= 10) ? _ratingLabels[r] : '';
 
 Color _ratingColor(int r) {
-  if (r <= 3) return Colors.red.shade600;
-  if (r <= 5) return Colors.orange.shade700;
-  if (r <= 7) return Colors.blue.shade700;
-  return Colors.green.shade700;
+  if (r <= 3) return const Color(0xFFEF4444);
+  if (r <= 5) return const Color(0xFFF59E0B);
+  if (r <= 7) return const Color(0xFF3B82F6);
+  return const Color(0xFF10B981);
 }
 
 class AddVisitScreen extends ConsumerStatefulWidget {
@@ -103,8 +68,11 @@ class AddVisitScreen extends ConsumerStatefulWidget {
 }
 
 class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
+  late TabController _tabController;
+  int _currentStep = 0;
+
   final _partyNameCtrl = TextEditingController();
   final _cityCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
@@ -136,8 +104,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
   double? _longitude;
   bool _locationBusy = false;
   String? _placeHeadline;
-  String _locationStatus =
-      'We will request location to fill the map pin and suggest address fields.';
+  String _locationStatus = 'Fetching GPS location...';
 
   Timer? _locationServicePoll;
 
@@ -150,6 +117,12 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) return;
+      setState(() => _currentStep = _tabController.index);
+    });
+
     _speech = stt.SpeechToText();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -160,14 +133,11 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
 
   @override
   void dispose() {
+    _tabController.dispose();
     _locationServicePoll?.cancel();
     WidgetsBinding.instance.removeObserver(this);
-    try {
-      _speech.stop();
-    } catch (_) {}
-    try {
-      _speech.cancel();
-    } catch (_) {}
+    try { _speech.stop(); } catch (_) {}
+    try { _speech.cancel(); } catch (_) {}
 
     _partyNameFocus.dispose();
     _cityFocus.dispose();
@@ -272,9 +242,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
       final marks = await placemarkFromCoordinates(lat, lng);
       if (!mounted || marks.isEmpty) return;
       _applyPlacemark(marks.first);
-    } catch (_) {
-      /* optional */
-    }
+    } catch (_) {}
   }
 
   void _startLocationServicePolling() {
@@ -294,8 +262,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
         if (mounted) {
           setState(() {
             _locationBusy = false;
-            _locationStatus =
-                'Location services are off. Turn them on and tap refresh, or enter the address manually.';
+            _locationStatus = 'Location services off. Turn on & retry.';
           });
         }
       }
@@ -306,7 +273,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
     if (!mounted) return;
     setState(() {
       _locationBusy = true;
-      _locationStatus = 'Checking location services…';
+      _locationStatus = 'Checking GPS...';
     });
 
     var serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -316,8 +283,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
       if (mounted) {
         setState(() {
           _locationBusy = false;
-          _locationStatus =
-              'Enable device location, then return to the app. We will retry automatically.';
+          _locationStatus = 'Enable GPS to auto-fill place details.';
         });
       }
       return;
@@ -331,8 +297,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
       if (mounted) {
         setState(() {
           _locationBusy = false;
-          _locationStatus =
-              'Location permission blocked. Open Settings to allow, or enter the site manually.';
+          _locationStatus = 'Location permission blocked in settings.';
         });
       }
       return;
@@ -341,15 +306,14 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
       if (mounted) {
         setState(() {
           _locationBusy = false;
-          _locationStatus =
-              'Location denied. You can still submit; tap refresh after allowing permission.';
+          _locationStatus = 'Location permission denied.';
         });
       }
       return;
     }
 
     if (!mounted) return;
-    setState(() => _locationStatus = 'Fetching GPS & place…');
+    setState(() => _locationStatus = 'Fetching accurate position...');
 
     try {
       final pos = await Geolocator.getCurrentPosition(
@@ -364,36 +328,15 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
         _longitude = pos.longitude;
         _locationBusy = false;
         _locationStatus =
-            'GPS locked · ${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
+            'GPS Locked (${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)})';
       });
       await _reverseGeocode(pos.latitude, pos.longitude);
-      if (mounted) {
-        setState(() {});
-      }
     } catch (_) {
-      try {
-        final pos = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-          ),
-        );
-        if (!mounted) return;
+      if (mounted) {
         setState(() {
-          _latitude = pos.latitude;
-          _longitude = pos.longitude;
           _locationBusy = false;
-          _locationStatus =
-              'GPS locked · ${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}';
+          _locationStatus = 'Location unavailable. Enter address manually.';
         });
-        await _reverseGeocode(pos.latitude, pos.longitude);
-      } catch (_) {
-        if (mounted) {
-          setState(() {
-            _locationBusy = false;
-            _locationStatus =
-                'Could not read GPS. You can still save; coordinates stay blank.';
-          });
-        }
       }
     }
   }
@@ -433,49 +376,103 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
   }
 
   Future<void> _showImageSourceSheet() async {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       backgroundColor: scheme.surface,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Visit photo',
-                style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                'Visit Proof Photo',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 4),
               Text(
-                'A clear site photo is required to submit (same as classic Sales App).',
+                'Take a photo of site or party meeting',
                 style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
               ),
-              const SizedBox(height: 16),
-              FilledButton.tonalIcon(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _pickImage(ImageSource.camera);
-                },
-                icon: const Icon(Icons.photo_camera_rounded),
-                label: const Text('Use camera'),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildModalOption(
+                      ctx,
+                      icon: Icons.camera_alt_rounded,
+                      label: 'Take Photo',
+                      color: scheme.primary,
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _pickImage(ImageSource.camera);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildModalOption(
+                      ctx,
+                      icon: Icons.photo_library_rounded,
+                      label: 'Gallery',
+                      color: scheme.secondary,
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        _pickImage(ImageSource.gallery);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModalOption(
+    BuildContext ctx, {
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: color.withOpacity(0.08),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 26),
               ),
               const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  _pickImage(ImageSource.gallery);
-                },
-                icon: const Icon(Icons.photo_library_outlined),
-                label: const Text('Pick from gallery'),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(ctx).colorScheme.onSurface,
+                ),
               ),
             ],
           ),
@@ -498,13 +495,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
     );
     if (t == null || !mounted) return;
     setState(() {
-      _visitWhen = DateTime(
-        d.year,
-        d.month,
-        d.day,
-        t.hour,
-        t.minute,
-      );
+      _visitWhen = DateTime(d.year, d.month, d.day, t.hour, t.minute);
     });
   }
 
@@ -528,31 +519,38 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
     return InputDecoration(
       labelText: label,
       hintText: hint,
-      prefixIcon: icon == null ? null : Icon(icon, size: 22),
+      prefixIcon: icon == null
+          ? null
+          : Icon(icon, size: 20, color: scheme.primary.withOpacity(0.8)),
       suffixIcon: suffixIcon,
+      isDense: true,
       filled: true,
-      fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.35),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+      fillColor: scheme.surfaceContainerLowest,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      labelStyle: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
+      ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: scheme.outlineVariant.withValues(alpha: .5)),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: scheme.outlineVariant.withOpacity(0.3)),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(color: scheme.primary.withValues(alpha: .75)),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: scheme.primary, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: scheme.error.withOpacity(0.8)),
       ),
     );
   }
 
   String _formatSpeechText(TextEditingController c, String text) {
     if (text.isEmpty) return text;
-    if (c == _contactEmailCtrl) {
-      return text.toLowerCase().replaceAll(' ', '');
-    }
-    if (c == _contactPhoneCtrl) {
-      return text.replaceAll(' ', '');
-    }
-    // Party / city / contact / purpose: light title-case for voice chunks
+    if (c == _contactEmailCtrl) return text.toLowerCase().replaceAll(' ', '');
+    if (c == _contactPhoneCtrl) return text.replaceAll(' ', '');
     if (c == _partyNameCtrl ||
         c == _cityCtrl ||
         c == _contactNameCtrl ||
@@ -569,17 +567,30 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
   }
 
   Widget _micButton(TextEditingController controller, FocusNode focus) {
-    final active =
-        _speechListening && identical(_speechTarget, controller);
-    return IconButton(
-      tooltip: active ? 'Stop voice input' : 'Voice input',
-      onPressed: () {
-        FocusScope.of(context).requestFocus(focus);
-        _toggleSpeech(controller);
-      },
-      icon: Icon(
-        active ? Icons.mic_rounded : Icons.mic_none_rounded,
-        color: active ? Colors.redAccent : null,
+    final active = _speechListening && identical(_speechTarget, controller);
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      child: IconButton(
+        key: ValueKey(active),
+        constraints: const BoxConstraints(),
+        padding: const EdgeInsets.only(right: 8),
+        tooltip: active ? 'Listening...' : 'Voice typing',
+        onPressed: () {
+          FocusScope.of(context).requestFocus(focus);
+          _toggleSpeech(controller);
+        },
+        icon: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: active ? Colors.red.shade50 : Colors.transparent,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            active ? Icons.mic_rounded : Icons.mic_none_rounded,
+            size: 20,
+            color: active ? Colors.redAccent : Theme.of(context).colorScheme.primary,
+          ),
+        ),
       ),
     );
   }
@@ -594,34 +605,23 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Microphone'),
-          content: const Text(
-            'Voice input needs microphone access. You can enable it in system settings.',
-          ),
+          title: const Text('Microphone Permission'),
+          content: const Text('Please enable microphone access in settings for voice typing.'),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('OK'),
-            ),
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
             TextButton(
               onPressed: () {
                 Navigator.pop(ctx);
                 openAppSettings();
               },
-              child: const Text('Open settings'),
+              child: const Text('Open Settings'),
             ),
           ],
         ),
       );
       return;
     }
-    if (!mic.isGranted) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Microphone permission is required for voice input.')),
-      );
-      return;
-    }
+    if (!mic.isGranted) return;
 
     if (_speechListening) {
       await _speech.stop();
@@ -635,33 +635,24 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
     }
 
     final ok = await _speech.initialize(
-        onStatus: (status) {
-          if (status == 'done' || status == 'notListening') {
-            if (!mounted) return;
-            setState(() {
-              _speechListening = false;
-              _speechTarget = null;
-            });
-          }
-        },
-        onError: (_) {
+      onStatus: (status) {
+        if (status == 'done' || status == 'notListening') {
           if (!mounted) return;
           setState(() {
             _speechListening = false;
             _speechTarget = null;
           });
-        },
-      );
-    if (!ok) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Speech recognition is not available on this device.'),
-          ),
-        );
-      }
-      return;
-    }
+        }
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() {
+          _speechListening = false;
+          _speechTarget = null;
+        });
+      },
+    );
+    if (!ok) return;
     if (!mounted) return;
     setState(() {
       _speechListening = true;
@@ -675,16 +666,12 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
           final raw = val.recognizedWords;
           final formatted = _formatSpeechText(controller, raw);
           if (_speechBaseline.isNotEmpty) {
-            final prefix = _speechBaseline.endsWith(' ')
-                ? _speechBaseline
-                : '$_speechBaseline ';
+            final prefix = _speechBaseline.endsWith(' ') ? _speechBaseline : '$_speechBaseline ';
             controller.text = '$prefix$formatted';
           } else {
             controller.text = formatted;
           }
-          controller.selection = TextSelection.collapsed(
-            offset: controller.text.length,
-          );
+          controller.selection = TextSelection.collapsed(offset: controller.text.length);
         });
       },
     );
@@ -694,7 +681,11 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
     if (!_formKey.currentState!.validate()) return;
     if (_selectedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add a visit photo.')),
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          content: const Text('Please upload a proof photo before saving.'),
+        ),
       );
       return;
     }
@@ -719,14 +710,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
         if (_longitude != null) 'longitude': _longitude,
         if (_followUpDate != null)
           'follow_up_date': _formatApiDateTime(
-            DateTime(
-              _followUpDate!.year,
-              _followUpDate!.month,
-              _followUpDate!.day,
-              10,
-              0,
-              0,
-            ),
+            DateTime(_followUpDate!.year, _followUpDate!.month, _followUpDate!.day, 10, 0, 0),
           ),
       };
       await ref.read(visitsProvider.notifier).createVisit(
@@ -738,627 +722,666 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save visit: ${_visitSaveErrorMessage(e)}')),
+        SnackBar(
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          content: Text('Failed to save visit: ${_visitSaveErrorMessage(e)}'),
+        ),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
+  Widget _buildCard({required Widget child}) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: scheme.outlineVariant.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(18.0),
+      child: child,
+    );
+  }
+
+  Widget _buildSegmentedPill<T>({
+    required T selected,
+    required List<ButtonSegment<T>> segments,
+    required ValueChanged<Set<T>> onSelectionChanged,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return SegmentedButton<T>(
+      style: SegmentedButton.styleFrom(
+        selectedBackgroundColor: scheme.primary,
+        selectedForegroundColor: scheme.onPrimary,
+        backgroundColor: scheme.surfaceContainerHighest.withOpacity(0.3),
+        foregroundColor: scheme.onSurfaceVariant,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        side: BorderSide.none,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      segments: segments,
+      selected: {selected},
+      onSelectionChanged: onSelectionChanged,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       drawer: const AppSideDrawer(),
       appBar: const SalesGlassAppBar(
-        title: 'Add visit',
+        title: 'AddVisit ',
         showDrawer: true,
       ),
       body: ScreenAccentBackdrop(
         spot: DrawerRouteAccents.addVisit,
         spot2: DrawerRouteAccents.addVisitWarm,
-        child: Column(
-        children: [
-          Expanded(
-            child: Form(
-              key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                children: [
-                  PremiumFeatureHeader(
-                    icon: Icons.add_location_alt_rounded,
-                    title: 'Capture the visit',
-                    subtitle:
-                        'GPS and reverse geocoding suggest city, state, and street like the classic app. Edit anything before saving.',
-                    trailing: IconButton(
-                      tooltip: 'Refresh GPS & place',
-                      onPressed: _locationBusy ? null : _refreshLocation,
-                      icon: _locationBusy
-                          ? SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: scheme.primary,
-                              ),
-                            )
-                          : Icon(Icons.my_location_rounded, color: scheme.primary),
-                    ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              // --- STEPPER PROGRESS TAB BAR ---
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: scheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: scheme.outlineVariant.withOpacity(0.2)),
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  dividerColor: Colors.transparent,
+                  indicator: BoxDecoration(
+                    color: scheme.primary,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  PremiumCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const PremiumSectionTitle(
-                          title: 'Party',
-                          subtitle: 'Who did you meet on site?',
-                        ),
-                        const SizedBox(height: 12),
-                        SegmentedButton<bool>(
-                          segments: const [
-                            ButtonSegment(
-                              value: true,
-                              label: Text('Client'),
-                              icon: Icon(Icons.business_rounded, size: 18),
-                            ),
-                            ButtonSegment(
-                              value: false,
-                              label: Text('Contractor'),
-                              icon: Icon(Icons.engineering_rounded, size: 18),
-                            ),
-                          ],
-                          selected: {_isClient},
-                          onSelectionChanged: (s) =>
-                              setState(() => _isClient = s.first),
-                        ),
-                        const SizedBox(height: 14),
-                        TextFormField(
-                          controller: _partyNameCtrl,
-                          focusNode: _partyNameFocus,
-                          decoration: _fieldDec(
-                            _isClient ? 'Client name' : 'Contractor name',
-                            icon: Icons.badge_outlined,
-                            suffixIcon: _micButton(_partyNameCtrl, _partyNameFocus),
-                          ),
-                          textCapitalization: TextCapitalization.words,
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) {
-                              return 'Required';
-                            }
-                            if (v.trim().length < 3) {
-                              return 'At least 3 characters';
-                            }
-                            return null;
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  PremiumCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const PremiumSectionTitle(
-                          title: 'Visit type & timing',
-                          subtitle: 'Matches legacy app: new vs follow-up.',
-                        ),
-                        const SizedBox(height: 12),
-                        SegmentedButton<bool>(
-                          segments: const [
-                            ButtonSegment(
-                              value: true,
-                              label: Text('New'),
-                              icon: Icon(Icons.fiber_new_rounded, size: 18),
-                            ),
-                            ButtonSegment(
-                              value: false,
-                              label: Text('Follow-up'),
-                              icon: Icon(Icons.reply_rounded, size: 18),
-                            ),
-                          ],
-                          selected: {_isNewVisit},
-                          onSelectionChanged: (s) {
-                            final next = s.first;
-                            setState(() {
-                              _isNewVisit = next;
-                              if (next) {
-                                _prefillContactFromAuth();
-                              } else {
-                                _contactPhoneCtrl.clear();
-                                _contactEmailCtrl.clear();
-                              }
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Icon(Icons.event_rounded, color: scheme.primary),
-                          title: const Text('Visit date & time'),
-                          subtitle: Text(
-                            DateFormat('EEE, d MMM yyyy · h:mm a')
-                                .format(_visitWhen),
-                          ),
-                          trailing: const Icon(Icons.edit_calendar_outlined),
-                          onTap: _pickVisitWhen,
-                        ),
-                        const Divider(height: 24),
-                        Material(
-                          color: scheme.surfaceContainerHighest
-                              .withValues(alpha: 0.45),
-                          borderRadius: BorderRadius.circular(16),
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            onTap: _locationBusy ? null : _refreshLocation,
-                            child: Padding(
-                              padding: const EdgeInsets.all(14),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  SizedBox(
-                                    width: 44,
-                                    height: 44,
-                                    child: _locationBusy
-                                        ? Padding(
-                                            padding: const EdgeInsets.all(10),
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                              color: scheme.primary,
-                                            ),
-                                          )
-                                        : Icon(
-                                            Icons.place_rounded,
-                                            color: scheme.primary,
-                                            size: 28,
-                                          ),
-                                  ),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          'Location & place',
-                                          style: Theme.of(context)
-                                              .textTheme
-                                              .titleSmall
-                                              ?.copyWith(fontWeight: FontWeight.w800),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          _locationStatus,
-                                          style: TextStyle(
-                                            color: scheme.onSurfaceVariant,
-                                            height: 1.35,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                        if (_placeHeadline != null &&
-                                            _placeHeadline!.trim().isNotEmpty) ...[
-                                          const SizedBox(height: 10),
-                                          Text(
-                                            _placeHeadline!,
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.w600,
-                                              color: scheme.onSurface,
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                  Icon(Icons.refresh_rounded, color: scheme.primary),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  PremiumCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const PremiumSectionTitle(
-                          title: 'Place',
-                          subtitle:
-                              'Reverse geocode fills these when GPS works; pick state from the list.',
-                        ),
-                        const SizedBox(height: 12),
-                        DropdownButtonFormField<String>(
-                          // ignore: deprecated_member_use — controlled updates from GPS / user
-                          value: _selectedState,
-                          decoration: _fieldDec('State', icon: Icons.map_outlined),
-                          hint: Text(
-                            'Select state',
-                            style: TextStyle(color: scheme.onSurfaceVariant),
-                          ),
-                          items: _indianStates
-                              .map(
-                                (s) => DropdownMenuItem(
-                                  value: s,
-                                  child: Text(s),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (v) => setState(() => _selectedState = v),
-                          validator: (v) =>
-                              (v == null || v.isEmpty) ? 'Pick a state' : null,
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _cityCtrl,
-                          focusNode: _cityFocus,
-                          decoration: _fieldDec(
-                            'City',
-                            icon: Icons.location_city_outlined,
-                            suffixIcon: _micButton(_cityCtrl, _cityFocus),
-                          ),
-                          textCapitalization: TextCapitalization.words,
-                          validator: (v) =>
-                              (v == null || v.trim().isEmpty) ? 'Required' : null,
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _addressCtrl,
-                          focusNode: _addressFocus,
-                          decoration: _fieldDec(
-                            'Address',
-                            icon: Icons.home_work_outlined,
-                            suffixIcon: _micButton(_addressCtrl, _addressFocus),
-                          ),
-                          maxLines: 3,
-                          textCapitalization: TextCapitalization.sentences,
-                          validator: (v) =>
-                              (v == null || v.trim().isEmpty) ? 'Required' : null,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  PremiumCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const PremiumSectionTitle(
-                          title: 'Contact on site',
-                          subtitle:
-                              'For new visits, your account email and phone start here — replace with the client if needed.',
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _contactNameCtrl,
-                          focusNode: _contactNameFocus,
-                          decoration: _fieldDec(
-                            'Name',
-                            icon: Icons.person_outline,
-                            suffixIcon: _micButton(_contactNameCtrl, _contactNameFocus),
-                          ),
-                          textCapitalization: TextCapitalization.words,
-                          validator: (v) =>
-                              (v == null || v.trim().isEmpty) ? 'Required' : null,
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _contactPhoneCtrl,
-                          focusNode: _contactPhoneFocus,
-                          keyboardType: TextInputType.phone,
-                          decoration: _fieldDec(
-                            'Phone',
-                            icon: Icons.phone_outlined,
-                            suffixIcon: _micButton(_contactPhoneCtrl, _contactPhoneFocus),
-                          ),
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) {
-                              return 'Required';
-                            }
-                            final digits = v.replaceAll(RegExp(r'[^0-9]'), '');
-                            if (digits.length != 10) {
-                              return 'Enter 10-digit phone';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _contactEmailCtrl,
-                          focusNode: _contactEmailFocus,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: _fieldDec(
-                            'Email',
-                            icon: Icons.email_outlined,
-                            suffixIcon: _micButton(_contactEmailCtrl, _contactEmailFocus),
-                          ),
-                          validator: (v) {
-                            if (v == null || v.trim().isEmpty) {
-                              return 'Required';
-                            }
-                            final ok = RegExp(
-                              r'^[^@\s]+@[^@\s]+\.[^@\s]+$',
-                            ).hasMatch(v.trim());
-                            if (!ok) return 'Invalid email';
-                            return null;
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  PremiumCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const PremiumSectionTitle(
-                          title: 'Outcome',
-                          subtitle: 'Purpose, notes, rating, follow-up.',
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _purposeCtrl,
-                          focusNode: _purposeFocus,
-                          decoration: _fieldDec(
-                            'Purpose',
-                            icon: Icons.flag_outlined,
-                            suffixIcon: _micButton(_purposeCtrl, _purposeFocus),
-                          ),
-                          textCapitalization: TextCapitalization.sentences,
-                          validator: (v) =>
-                              (v == null || v.trim().isEmpty) ? 'Required' : null,
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _notesCtrl,
-                          focusNode: _notesFocus,
-                          maxLines: 4,
-                          decoration: _fieldDec(
-                            'Notes',
-                            hint: 'Optional — key takeaways',
-                            icon: Icons.notes_rounded,
-                            suffixIcon: _micButton(_notesCtrl, _notesFocus),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        DropdownButtonFormField<int>(
-                          // ignore: deprecated_member_use — rating must stay controlled
-                          value: _rating,
-                          isExpanded: true,
-                          decoration: _fieldDec(
-                            'Interest level (1–10)',
-                            icon: Icons.star_rate_rounded,
-                          ),
-                          items: List.generate(10, (i) {
-                            final n = i + 1;
-                            final label = _ratingLabelFor(n);
-                            return DropdownMenuItem(
-                              value: n,
-                              child: Text(
-                                '$n — $label',
-                                style: TextStyle(color: _ratingColor(n)),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            );
-                          }),
-                          onChanged: (v) {
-                            if (v != null) setState(() => _rating = v);
-                          },
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _ratingLabelFor(_rating),
-                          style: TextStyle(
-                            color: scheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w500,
-                            height: 1.35,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading:
-                              Icon(Icons.event_available_outlined, color: scheme.primary),
-                          title: Text(
-                            _followUpDate == null
-                                ? 'Follow-up date (optional)'
-                                : 'Follow-up · ${DateFormat('d MMM yyyy').format(_followUpDate!)}',
-                          ),
-                          trailing: TextButton(
-                            onPressed: () async {
-                              final now = DateTime.now();
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: _followUpDate ?? now,
-                                firstDate: now,
-                                lastDate: DateTime(now.year + 2),
-                              );
-                              if (picked != null) {
-                                setState(() => _followUpDate = picked);
-                              }
-                            },
-                            child: const Text('Pick'),
-                          ),
-                        ),
-                        if (_followUpDate != null)
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton.icon(
-                              onPressed: () =>
-                                  setState(() => _followUpDate = null),
-                              icon: const Icon(Icons.close_rounded, size: 18),
-                              label: const Text('Remove follow-up date'),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  PremiumCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const PremiumSectionTitle(
-                          title: 'Proof photo',
-                          subtitle: 'Compressed before upload to save data.',
-                        ),
-                        const SizedBox(height: 12),
-                        AspectRatio(
-                          aspectRatio: 16 / 10,
-                          child: Material(
-                            color: scheme.surfaceContainerHighest
-                                .withValues(alpha: 0.5),
-                            borderRadius: BorderRadius.circular(18),
-                            child: InkWell(
-                              onTap: _showImageSourceSheet,
-                              borderRadius: BorderRadius.circular(18),
-                              child: _selectedImage == null
-                                  ? CustomPaint(
-                                      painter: _DashedBorderPainter(
-                                        color: scheme.outlineVariant,
-                                      ),
-                                      child: Center(
-                                        child: Column(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            Icon(
-                                              Icons.add_a_photo_rounded,
-                                              size: 40,
-                                              color: scheme.primary,
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Text(
-                                              'Tap to add photo',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w600,
-                                                color: scheme.onSurfaceVariant,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    )
-                                  : ClipRRect(
-                                      borderRadius: BorderRadius.circular(18),
-                                      child: Stack(
-                                        fit: StackFit.expand,
-                                        children: [
-                                          Image.file(
-                                            _selectedImage!,
-                                            fit: BoxFit.cover,
-                                          ),
-                                          Positioned(
-                                            right: 8,
-                                            top: 8,
-                                            child: FilledButton.tonal(
-                                              onPressed: _showImageSourceSheet,
-                                              child: const Icon(Icons.edit_rounded),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              ),
-            ),
-          ),
-          Material(
-            elevation: 8,
-            shadowColor: Colors.black38,
-            color: scheme.surface,
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                child: FilledButton(
-                  onPressed: _saving ? null : _save,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size.fromHeight(52),
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: _saving
-                      ? Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                color: scheme.onPrimary,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Saving…',
-                              style: TextStyle(
-                                color: scheme.onPrimary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        )
-                      : const Text(
-                          'Save visit',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                          ),
-                        ),
+                  labelColor: scheme.onPrimary,
+                  unselectedLabelColor: scheme.onSurfaceVariant,
+                  labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  tabs: const [
+                    Tab(text: '1. Location'),
+                    Tab(text: '2. Contact'),
+                    Tab(text: '3. Outcome'),
+                  ],
                 ),
               ),
-            ),
+
+              // --- TAB VIEWS ---
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    // TAB 1: LOCATION & PARTY
+                    ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      children: [
+                        // GPS Status Banner
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                scheme.primary.withOpacity(0.06),
+                                scheme.secondary.withOpacity(0.03),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: scheme.primary.withOpacity(0.12)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: scheme.primary.withOpacity(0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(Icons.my_location_rounded, size: 18, color: scheme.primary),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _placeHeadline ?? 'Location Status',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: scheme.onSurface,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      _locationStatus,
+                                      style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              IconButton(
+                                onPressed: _locationBusy ? null : _refreshLocation,
+                                style: IconButton.styleFrom(backgroundColor: scheme.surface),
+                                icon: _locationBusy
+                                    ? SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: scheme.primary),
+                                      )
+                                    : Icon(Icons.refresh_rounded, size: 18, color: scheme.primary),
+                              )
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        _buildCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('PARTY DETAILS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: scheme.primary, letterSpacing: 0.5)),
+                              const SizedBox(height: 14),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildSegmentedPill<bool>(
+                                      selected: _isClient,
+                                      segments: const [
+                                        ButtonSegment(value: true, label: Text('Client', style: TextStyle(fontSize: 12))),
+                                        ButtonSegment(value: false, label: Text('Contractor', style: TextStyle(fontSize: 12))),
+                                      ],
+                                      onSelectionChanged: (s) => setState(() => _isClient = s.first),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: _buildSegmentedPill<bool>(
+                                      selected: _isNewVisit,
+                                      segments: const [
+                                        ButtonSegment(value: true, label: Text('New Visit', style: TextStyle(fontSize: 12))),
+                                        ButtonSegment(value: false, label: Text('Followup', style: TextStyle(fontSize: 12))),
+                                      ],
+                                      onSelectionChanged: (s) {
+                                        final next = s.first;
+                                        setState(() {
+                                          _isNewVisit = next;
+                                          if (next) {
+                                            _prefillContactFromAuth();
+                                          } else {
+                                            _contactPhoneCtrl.clear();
+                                            _contactEmailCtrl.clear();
+                                          }
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+                              TextFormField(
+                                controller: _partyNameCtrl,
+                                focusNode: _partyNameFocus,
+                                decoration: _fieldDec(
+                                  _isClient ? 'Client / Company Name' : 'Contractor Name',
+                                  icon: Icons.business_rounded,
+                                  suffixIcon: _micButton(_partyNameCtrl, _partyNameFocus),
+                                ),
+                                textCapitalization: TextCapitalization.words,
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) return 'Required';
+                                  if (v.trim().length < 3) return 'Min 3 chars';
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              InkWell(
+                                onTap: _pickVisitWhen,
+                                borderRadius: BorderRadius.circular(14),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: scheme.surfaceContainerHighest.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(color: scheme.outlineVariant.withOpacity(0.3)),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.calendar_today_rounded, size: 18, color: scheme.primary),
+                                      const SizedBox(width: 10),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text('Visit Time', style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant)),
+                                          Text(
+                                            DateFormat('EEE, dd MMM yyyy · hh:mm a').format(_visitWhen),
+                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                      const Spacer(),
+                                      Icon(Icons.edit_calendar_rounded, size: 18, color: scheme.primary),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        _buildCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('ADDRESS DETAILS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: scheme.primary, letterSpacing: 0.5)),
+                              const SizedBox(height: 14),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      value: _selectedState,
+                                      isExpanded: true,
+                                      decoration: _fieldDec('State'),
+                                      hint: const Text('State', style: TextStyle(fontSize: 12)),
+                                      items: _indianStates
+                                          .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12))))
+                                          .toList(),
+                                      onChanged: (v) => setState(() => _selectedState = v),
+                                      validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: _cityCtrl,
+                                      focusNode: _cityFocus,
+                                      decoration: _fieldDec(
+                                        'City',
+                                        suffixIcon: _micButton(_cityCtrl, _cityFocus),
+                                      ),
+                                      textCapitalization: TextCapitalization.words,
+                                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: _addressCtrl,
+                                focusNode: _addressFocus,
+                                decoration: _fieldDec(
+                                  'Full Address Line',
+                                  icon: Icons.map_rounded,
+                                  suffixIcon: _micButton(_addressCtrl, _addressFocus),
+                                ),
+                                maxLines: 2,
+                                textCapitalization: TextCapitalization.sentences,
+                                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // TAB 2: CONTACT INFORMATION
+                    ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      children: [
+                        _buildCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('PRIMARY CONTACT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: scheme.primary, letterSpacing: 0.5)),
+                              const SizedBox(height: 14),
+                              TextFormField(
+                                controller: _contactNameCtrl,
+                                focusNode: _contactNameFocus,
+                                decoration: _fieldDec(
+                                  'Contact Person Name',
+                                  icon: Icons.person_rounded,
+                                  suffixIcon: _micButton(_contactNameCtrl, _contactNameFocus),
+                                ),
+                                textCapitalization: TextCapitalization.words,
+                                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: _contactPhoneCtrl,
+                                focusNode: _contactPhoneFocus,
+                                keyboardType: TextInputType.phone,
+                                decoration: _fieldDec(
+                                  'Phone Number',
+                                  icon: Icons.phone_rounded,
+                                  suffixIcon: _micButton(_contactPhoneCtrl, _contactPhoneFocus),
+                                ),
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) return 'Required';
+                                  final digits = v.replaceAll(RegExp(r'[^0-9]'), '');
+                                  if (digits.length != 10) return '10 digits';
+                                  return null;
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: _contactEmailCtrl,
+                                focusNode: _contactEmailFocus,
+                                keyboardType: TextInputType.emailAddress,
+                                decoration: _fieldDec(
+                                  'Email Address',
+                                  icon: Icons.alternate_email_rounded,
+                                  suffixIcon: _micButton(_contactEmailCtrl, _contactEmailFocus),
+                                ),
+                                validator: (v) {
+                                  if (v == null || v.trim().isEmpty) return 'Required';
+                                  final ok = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim());
+                                  if (!ok) return 'Invalid';
+                                  return null;
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // TAB 3: OUTCOME & PROOF
+                    ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      children: [
+                        _buildCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('VISIT PURPOSE & FEEDBACK', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: scheme.primary, letterSpacing: 0.5)),
+                              const SizedBox(height: 14),
+                              TextFormField(
+                                controller: _purposeCtrl,
+                                focusNode: _purposeFocus,
+                                decoration: _fieldDec(
+                                  'Purpose of Visit',
+                                  icon: Icons.track_changes_rounded,
+                                  suffixIcon: _micButton(_purposeCtrl, _purposeFocus),
+                                ),
+                                textCapitalization: TextCapitalization.sentences,
+                                validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                              ),
+                              const SizedBox(height: 12),
+
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: scheme.surfaceContainerLowest,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: scheme.outlineVariant.withOpacity(0.3)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.star_rounded, color: _ratingColor(_rating), size: 22),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: DropdownButtonHideUnderline(
+                                        child: DropdownButton<int>(
+                                          value: _rating,
+                                          isExpanded: true,
+                                          items: List.generate(10, (i) {
+                                            final n = i + 1;
+                                            final label = _ratingLabelFor(n);
+                                            return DropdownMenuItem(
+                                              value: n,
+                                              child: Row(
+                                                children: [
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: _ratingColor(n).withOpacity(0.12),
+                                                      borderRadius: BorderRadius.circular(6),
+                                                    ),
+                                                    child: Text(
+                                                      '$n',
+                                                      style: TextStyle(
+                                                        fontWeight: FontWeight.bold,
+                                                        color: _ratingColor(n),
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Expanded(
+                                                    child: Text(
+                                                      label,
+                                                      style: TextStyle(color: scheme.onSurface, fontSize: 12),
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          }),
+                                          onChanged: (v) {
+                                            if (v != null) setState(() => _rating = v);
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: _notesCtrl,
+                                focusNode: _notesFocus,
+                                maxLines: 2,
+                                decoration: _fieldDec(
+                                  'Discussion Notes (Optional)',
+                                  icon: Icons.notes_rounded,
+                                  suffixIcon: _micButton(_notesCtrl, _notesFocus),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              InkWell(
+                                onTap: () async {
+                                  final now = DateTime.now();
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: _followUpDate ?? now,
+                                    firstDate: now,
+                                    lastDate: DateTime(now.year + 2),
+                                  );
+                                  if (picked != null) setState(() => _followUpDate = picked);
+                                },
+                                borderRadius: BorderRadius.circular(14),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: _followUpDate == null
+                                        ? scheme.surfaceContainerHighest.withOpacity(0.2)
+                                        : scheme.primary.withOpacity(0.08),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: _followUpDate == null
+                                          ? scheme.outlineVariant.withOpacity(0.3)
+                                          : scheme.primary.withOpacity(0.3),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.event_repeat_rounded,
+                                        size: 18,
+                                        color: _followUpDate == null ? scheme.onSurfaceVariant : scheme.primary,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        _followUpDate == null
+                                            ? 'Set Follow-up Date'
+                                            : 'Follow-up: ${DateFormat('dd MMM yyyy').format(_followUpDate!)}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: _followUpDate == null ? FontWeight.normal : FontWeight.bold,
+                                          color: _followUpDate == null ? scheme.onSurfaceVariant : scheme.primary,
+                                        ),
+                                      ),
+                                      const Spacer(),
+                                      if (_followUpDate != null)
+                                        GestureDetector(
+                                          onTap: () => setState(() => _followUpDate = null),
+                                          child: Icon(Icons.cancel_rounded, size: 18, color: scheme.primary),
+                                        )
+                                      else
+                                        Icon(Icons.add_rounded, size: 18, color: scheme.onSurfaceVariant),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        _buildCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('PHOTO PROOF', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: scheme.primary, letterSpacing: 0.5)),
+                              const SizedBox(height: 14),
+                              Container(
+                                height: 130,
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: scheme.surfaceContainerHighest.withOpacity(0.15),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: _selectedImage == null
+                                        ? scheme.outlineVariant.withOpacity(0.3)
+                                        : scheme.primary.withOpacity(0.5),
+                                  ),
+                                ),
+                                child: InkWell(
+                                  onTap: _showImageSourceSheet,
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: _selectedImage == null
+                                      ? Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.add_a_photo_rounded, size: 24, color: scheme.primary),
+                                            const SizedBox(height: 6),
+                                            Text(
+                                              'Upload proof photo',
+                                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: scheme.onSurfaceVariant),
+                                            ),
+                                          ],
+                                        )
+                                      : ClipRRect(
+                                          borderRadius: BorderRadius.circular(16),
+                                          child: Stack(
+                                            fit: StackFit.expand,
+                                            children: [
+                                              Image.file(_selectedImage!, fit: BoxFit.cover),
+                                              Container(color: Colors.black38),
+                                              Center(
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.black.withOpacity(0.7),
+                                                    borderRadius: BorderRadius.circular(20),
+                                                  ),
+                                                  child: const Text('Change Photo', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // --- BOTTOM NAVIGATION BUTTONS ---
+              Container(
+                decoration: BoxDecoration(
+                  color: scheme.surface,
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, -4)),
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: SafeArea(
+                  top: false,
+                  child: Row(
+                    children: [
+                      if (_currentStep > 0)
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => _tabController.animateTo(_currentStep - 1),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            ),
+                            child: const Text('Back'),
+                          ),
+                        ),
+                      if (_currentStep > 0) const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: FilledButton(
+                          onPressed: () {
+                            if (_currentStep < 2) {
+                              _tabController.animateTo(_currentStep + 1);
+                            } else {
+                              if (!_saving) _save();
+                            }
+                          },
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(48),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: _saving
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : Text(
+                                  _currentStep == 2 ? 'Save Visit' : 'Next Step',
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
       ),
     );
   }
-}
-
-class _DashedBorderPainter extends CustomPainter {
-  _DashedBorderPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final r = RRect.fromRectAndRadius(
-      Rect.fromLTWH(1, 1, size.width - 2, size.height - 2),
-      const Radius.circular(18),
-    );
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6;
-    const dash = 7.0;
-    const gap = 5.0;
-    final path = Path()..addRRect(r);
-    for (final metric in path.computeMetrics()) {
-      double d = 0;
-      while (d < metric.length) {
-        final next = d + dash;
-        canvas.drawPath(
-          metric.extractPath(d, next.clamp(0, metric.length)),
-          paint,
-        );
-        d = next + gap;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

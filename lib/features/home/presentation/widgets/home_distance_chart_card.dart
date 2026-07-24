@@ -6,79 +6,90 @@ import 'package:intl/intl.dart';
 import '../../data/models/home_models.dart';
 import 'home_dashboard_chrome.dart';
 
-/// Field-tracking palette (aligned with distance hero — reads as route / km).
 abstract final class _KmTrackAccent {
   static const Color teal = Color(0xFF0D9488);
   static const Color cyan = Color(0xFF0891B2);
   static const Color deep = Color(0xFF0F766E);
   static const Color roll = Color(0xFF059669);
-  static const Color ink = Color(0xFF134E4A);
+  static const Color trackBg = Color(0xFFF1F5F9);
 }
 
-/// Bar chart of daily distance (km) — up to 31 days.
-class HomeDistanceChartCard extends StatelessWidget {
+class HomeDistanceChartCard extends StatefulWidget {
   const HomeDistanceChartCard({super.key, required this.byDay});
 
   final List<DailyChartPoint> byDay;
 
   @override
+  State<HomeDistanceChartCard> createState() => _HomeDistanceChartCardState();
+}
+
+class _HomeDistanceChartCardState extends State<HomeDistanceChartCard> {
+  int? _touchedIndex;
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final data = HomeDistanceChartCard._trim(byDay, 31);
+    final data = _trim(widget.byDay, 31);
+
     if (data.isEmpty) {
-      return HomeDistanceChartCard._emptyCard(
-        context,
-        'No travel in this range yet.',
-      );
+      return _emptyCard(context, 'No travel in this range yet.');
     }
 
-    final maxY = data.map((e) => e.distanceKm).reduce((a, b) => a > b ? a : b);
-    final top = maxY <= 0 ? 5.0 : (maxY * 1.14).clamp(1.0, double.infinity);
+    // Calculations for KPIs & Axes
+    final totalKm = data.fold<double>(0, (sum, item) => sum + item.distanceKm);
+    final avgKm = totalKm / data.length;
 
-    var peakIdx = 0;
-    for (var i = 1; i < data.length; i++) {
-      if (data[i].distanceKm > data[peakIdx].distanceKm) peakIdx = i;
+    double maxY = 0;
+    int peakIdx = 0;
+    for (var i = 0; i < data.length; i++) {
+      if (data[i].distanceKm > maxY) {
+        maxY = data[i].distanceKm;
+        peakIdx = i;
+      }
     }
-    final peakKm = data[peakIdx].distanceKm;
+
+    final top = maxY <= 0 ? 10.0 : (maxY * 1.15).ceilToDouble();
+    final selectedPoint = _touchedIndex != null && _touchedIndex! < data.length
+        ? data[_touchedIndex!]
+        : data[peakIdx];
 
     final n = data.length;
     final barW = n > 22 ? 6.0 : (n > 16 ? 8.0 : (n > 10 ? 10.0 : 12.0));
-    final barsSpace = n > 22 ? 2.5 : (n > 16 ? 3.5 : 4.5);
     final labelEvery = n > 24 ? 5 : (n > 18 ? 3 : (n > 12 ? 2 : 1));
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      padding: const EdgeInsets.all(18),
       decoration: HomeDashboardChrome.panelDecoration(scheme),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header Section
           HomeDashboardChrome.sectionHeader(
             context,
             eyebrow: 'Tracking',
             title: 'Daily distance',
-            subtitle: 'Kilometres logged per day · tap a bar for detail',
+            subtitle: 'Kilometres logged per day',
             icon: Icons.near_me_rounded,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 14),
+
+          // 1. KPI Summary Cards (Modern Badges)
+        
+          const SizedBox(height: 8),
+
+          // 2. Chart Container
           Container(
-            padding: const EdgeInsets.fromLTRB(12, 14, 12, 10),
+            padding: const EdgeInsets.fromLTRB(10, 16, 12, 12),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              color: scheme.surfaceContainerLow.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(20),
+              color: scheme.surfaceContainerLow.withValues(alpha: 0.6),
               border: Border.all(
-                color: scheme.outlineVariant.withValues(alpha: 0.32),
+                color: scheme.outlineVariant.withValues(alpha: 0.25),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: _KmTrackAccent.teal.withValues(alpha: 0.06),
-                  blurRadius: 20,
-                  offset: const Offset(0, 8),
-                ),
-              ],
             ),
             child: SizedBox(
-              height: 224,
+              height: 190,
               child: BarChart(
                 BarChartData(
                   alignment: BarChartAlignment.spaceAround,
@@ -87,71 +98,30 @@ class HomeDistanceChartCard extends StatelessWidget {
                   gridData: FlGridData(
                     show: true,
                     drawVerticalLine: false,
-                    horizontalInterval: top / 4,
+                    horizontalInterval: top / 3 > 0 ? top / 3 : 1,
                     getDrawingHorizontalLine: (v) => FlLine(
-                      color: scheme.outline.withValues(alpha: 0.11),
+                      color: scheme.outline.withValues(alpha: 0.08),
                       strokeWidth: 1,
+                      dashArray: [4, 4], // Dashed lines look modern
                     ),
                   ),
-                  borderData: FlBorderData(
-                    show: true,
-                    border: Border(
-                      bottom: BorderSide(
-                        color: _KmTrackAccent.teal.withValues(alpha: 0.22),
-                        width: 1,
-                      ),
-                    ),
-                  ),
+                  borderData: FlBorderData(show: false),
                   titlesData: FlTitlesData(
-                    topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     leftTitles: AxisTitles(
-                      axisNameWidget: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.straighten_rounded,
-                            size: 11,
-                            color: _KmTrackAccent.teal.withValues(alpha: 0.8),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            'km',
-                            style: GoogleFonts.inter(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.9,
-                              color: _KmTrackAccent.teal.withValues(alpha: 0.78),
-                            ),
-                          ),
-                        ],
-                      ),
-                      axisNameSize: 16,
                       sideTitles: SideTitles(
-                        reservedSize: 36,
+                        reservedSize: 32,
                         showTitles: true,
-                        interval: top / 4,
+                        interval: top / 3 > 0 ? top / 3 : 1,
                         getTitlesWidget: (value, meta) {
-                          if (value < 0 || value > top * 1.01) {
-                            return const SizedBox.shrink();
-                          }
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 6),
-                            child: Text(
-                              value == 0
-                                  ? '0'
-                                  : value.toStringAsFixed(
-                                      value >= 10 ? 0 : 1,
-                                    ),
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: scheme.onSurface.withValues(alpha: 0.4),
-                              ),
+                          if (value < 0 || value > top) return const SizedBox.shrink();
+                          return Text(
+                            value.toInt().toString(),
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: scheme.onSurface.withValues(alpha: 0.4),
                             ),
                           );
                         },
@@ -160,24 +130,23 @@ class HomeDistanceChartCard extends StatelessWidget {
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
-                        reservedSize: 28,
+                        reservedSize: 24,
                         getTitlesWidget: (i, meta) {
                           final idx = i.toInt();
-                          if (idx < 0 || idx >= data.length) {
+                          if (idx < 0 || idx >= data.length) return const SizedBox.shrink();
+                          if (idx % labelEvery != 0 && idx != data.length - 1) {
                             return const SizedBox.shrink();
                           }
-                          final show = idx % labelEvery == 0 ||
-                              idx == data.length - 1;
-                          if (!show) return const SizedBox.shrink();
-                          final short = _shortDate(data[idx].date);
                           return Padding(
-                            padding: const EdgeInsets.only(top: 7),
+                            padding: const EdgeInsets.only(top: 6),
                             child: Text(
-                              short,
+                              _shortDate(data[idx].date),
                               style: GoogleFonts.inter(
                                 fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                                color: scheme.onSurface.withValues(alpha: 0.48),
+                                fontWeight: _touchedIndex == idx ? FontWeight.w800 : FontWeight.w500,
+                                color: _touchedIndex == idx
+                                    ? _KmTrackAccent.teal
+                                    : scheme.onSurface.withValues(alpha: 0.45),
                               ),
                             ),
                           );
@@ -185,80 +154,179 @@ class HomeDistanceChartCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  // Touch Interaction Setup
+                  barTouchData: BarTouchData(
+                    enabled: true,
+                    touchCallback: (FlTouchEvent event, response) {
+                      if (event is FlTapUpEvent || event is FlPanUpdateEvent) {
+                        final index = response?.spot?.touchedBarGroupIndex;
+                        if (index != null && index != _touchedIndex) {
+                          setState(() => _touchedIndex = index);
+                        }
+                      }
+                    },
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (_) => Colors.transparent, // Disable standard floating box
+                      tooltipPadding: EdgeInsets.zero,
+                      getTooltipItem: (_, __, ___, ____) => null,
+                    ),
+                  ),
                   barGroups: List.generate(data.length, (i) {
-                    final isPeak = peakKm > 0 &&
-                        i == peakIdx &&
-                        data[i].distanceKm > 0;
-                    final cap = Radius.circular(barW >= 10 ? 6 : 5);
+                    final isPeak = peakIdx == i && data[i].distanceKm > 0;
+                    final isSelected = _touchedIndex == i;
+
                     return BarChartGroupData(
                       x: i,
-                      barsSpace: barsSpace,
                       barRods: [
                         BarChartRodData(
                           toY: data[i].distanceKm,
-                          width: barW,
-                          borderRadius: BorderRadius.vertical(top: cap),
-                          borderSide: BorderSide(
-                            color: Colors.white.withValues(alpha: 0.18),
-                            width: 0.75,
+                          width: isSelected ? barW + 2 : barW,
+                          borderRadius: BorderRadius.circular(6),
+                          // Modern Track Pill Background
+                          backDrawRodData: BackgroundBarChartRodData(
+                            show: true,
+                            toY: top,
+                            color: scheme.onSurface.withValues(alpha: 0.04),
                           ),
                           gradient: LinearGradient(
                             begin: Alignment.bottomCenter,
                             end: Alignment.topCenter,
-                            colors: isPeak
-                                ? [
-                                    _KmTrackAccent.deep.withValues(alpha: 0.55),
-                                    _KmTrackAccent.roll,
-                                    _KmTrackAccent.cyan,
-                                  ]
-                                : [
-                                    _KmTrackAccent.deep.withValues(alpha: 0.42),
-                                    _KmTrackAccent.teal,
-                                    _KmTrackAccent.cyan,
-                                  ],
-                            stops: const [0.0, 0.52, 1.0],
+                            colors: isSelected
+                                ? [_KmTrackAccent.deep, _KmTrackAccent.cyan]
+                                : isPeak
+                                    ? [_KmTrackAccent.roll, _KmTrackAccent.teal]
+                                    : [
+                                        _KmTrackAccent.teal.withValues(alpha: 0.4),
+                                        _KmTrackAccent.teal,
+                                      ],
                           ),
                         ),
                       ],
                     );
                   }),
-                  barTouchData: BarTouchData(
-                    enabled: true,
-                    touchTooltipData: BarTouchTooltipData(
-                      tooltipBorderRadius: BorderRadius.circular(12),
-                      tooltipPadding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                      maxContentWidth: 200,
-                      fitInsideHorizontally: true,
-                      fitInsideVertically: true,
-                      getTooltipColor: (_) =>
-                          _KmTrackAccent.ink.withValues(alpha: 0.94),
-                      tooltipBorder: BorderSide(
-                        color: _KmTrackAccent.cyan.withValues(alpha: 0.4),
-                        width: 1,
-                      ),
-                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                        final idx = group.x.toInt();
-                        if (idx < 0 || idx >= data.length) return null;
-                        final d = data[idx];
-                        return BarTooltipItem(
-                          '${_longDate(d.date)}\n'
-                          '${d.distanceKm.toStringAsFixed(2)} km\n'
-                          '${d.visits} visits',
-                          GoogleFonts.inter(
-                            color: Colors.white.withValues(alpha: 0.95),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 12,
-                            height: 1.35,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
                 ),
               ),
             ),
           ),
+          const SizedBox(height: 12),
+
+          // 3. Selected Point Interactive Detail Strip
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: _KmTrackAccent.teal.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: _KmTrackAccent.teal.withValues(alpha: 0.2),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.calendar_today_rounded,
+                      size: 14,
+                      color: _KmTrackAccent.teal,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _longDate(selectedPoint.date),
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+                Row(
+                  children: [
+                    Text(
+                      '${selectedPoint.distanceKm.toStringAsFixed(2)} km',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        color: _KmTrackAccent.teal,
+                      ),
+                    ),
+                    Text(
+                      '  •  ${selectedPoint.visits} visits',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  // Helper Widget for KPI Badges
+  Widget _buildKpiChip(
+    BuildContext context, {
+    required String label,
+    required String value,
+    required IconData icon,
+    bool isHighlight = false,
+  }) {
+    final scheme = Theme.of(context).colorScheme;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isHighlight
+              ? _KmTrackAccent.teal.withValues(alpha: 0.12)
+              : scheme.surfaceContainerHighest.withValues(alpha: 0.3),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isHighlight
+                ? _KmTrackAccent.teal.withValues(alpha: 0.3)
+                : Colors.transparent,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 12,
+                  color: isHighlight ? _KmTrackAccent.teal : scheme.outline,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  label,
+                  style: GoogleFonts.inter(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: isHighlight ? _KmTrackAccent.deep : scheme.onSurface,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -272,59 +340,17 @@ class HomeDistanceChartCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
+      padding: const EdgeInsets.all(18),
       decoration: HomeDashboardChrome.panelDecoration(scheme),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(14),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  _KmTrackAccent.teal.withValues(alpha: 0.2),
-                  _KmTrackAccent.cyan.withValues(alpha: 0.1),
-                ],
-              ),
-              border: Border.all(
-                color: _KmTrackAccent.teal.withValues(alpha: 0.26),
-              ),
-            ),
-            child: Icon(
-              Icons.near_me_rounded,
-              color: _KmTrackAccent.teal,
-              size: 24,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Daily distance',
-                  style: GoogleFonts.inter(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.35,
-                    color: scheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  msg,
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    height: 1.35,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+          Icon(Icons.near_me_rounded, color: _KmTrackAccent.teal, size: 24),
+          const SizedBox(width: 12),
+          Text(
+            msg,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: scheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -337,14 +363,14 @@ class HomeDistanceChartCard extends StatelessWidget {
       final d = DateFormat('yyyy-MM-dd').parse(ymd);
       return DateFormat('d MMM').format(d);
     } catch (_) {
-      return ymd.length > 5 ? ymd.substring(5) : ymd;
+      return ymd;
     }
   }
 
   static String _longDate(String ymd) {
     try {
       final d = DateFormat('yyyy-MM-dd').parse(ymd);
-      return DateFormat('EEE d MMM').format(d);
+      return DateFormat('EEE, d MMM').format(d);
     } catch (_) {
       return ymd;
     }

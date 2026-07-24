@@ -6,7 +6,6 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../shared/utils/permission_utils.dart';
 import '../providers/home_dashboard_provider.dart';
 import 'home_distance_chart_card.dart';
-import 'home_live_tracking_card.dart';
 import 'home_timeline_section.dart';
 import 'home_tracking_hero.dart';
 import 'home_welcome_header.dart';
@@ -97,12 +96,12 @@ class HomeDashboardBody extends ConsumerWidget {
                       displayRangeEnd: data.displayRangeEnd,
                     ).animate().fadeIn(duration: 340.ms).slideY(begin: 0.05, end: 0),
                     const SizedBox(height: 20),
-                    if (data.isCurrentMonthMtd) ...[
-                      HomeLiveTrackingCard(live: data.performance.live)
-                          .animate()
-                          .fadeIn(delay: 70.ms, duration: 360.ms),
-                      const SizedBox(height: 20),
-                    ],
+                    // if (data.isCurrentMonthMtd) ...[
+                    //   HomeLiveTrackingCard(live: data.performance.live)
+                    //       .animate()
+                    //       .fadeIn(delay: 70.ms, duration: 360.ms),
+                    //   const SizedBox(height: 20),
+                    // ],
                     HomeDistanceChartCard(byDay: data.performance.byDay)
                         .animate()
                         .fadeIn(delay: 110.ms, duration: 380.ms),

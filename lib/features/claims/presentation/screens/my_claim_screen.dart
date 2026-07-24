@@ -22,7 +22,7 @@ class _ExtraExpenseDraft {
   }
 }
 
-/// Monthly distance claim — parity with legacy Sales App + [salesvisitpro_api] `claimController`.
+/// Modern UI: Monthly distance claim screen
 class MyClaimScreen extends ConsumerStatefulWidget {
   const MyClaimScreen({super.key});
 
@@ -74,11 +74,11 @@ class _MyClaimScreenState extends ConsumerState<MyClaimScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Claims not available today'),
+        title: const Text('Claims Not Available Today'),
         content: Text(
           '${availabilityMessage.trim()}\n\n'
           'Distance for this claim covers: $periodLabel.',
-          style: TextStyle(color: scheme.onSurfaceVariant, height: 1.35),
+          style: TextStyle(color: scheme.onSurfaceVariant, height: 1.4),
         ),
         actions: [
           TextButton(
@@ -96,8 +96,7 @@ class _MyClaimScreenState extends ConsumerState<MyClaimScreen> {
     final value = double.tryParse(text);
     if (value == null || value < 0) {
       setState(
-        () => _advanceError =
-            'Enter a valid advance payment (or leave blank for 0)',
+        () => _advanceError = 'Enter a valid advance payment amount (or leave blank)',
       );
       return null;
     }
@@ -113,15 +112,14 @@ class _MyClaimScreenState extends ConsumerState<MyClaimScreen> {
       if (type.isEmpty && amountText.isEmpty) continue;
       if (type.isEmpty) {
         setState(
-          () => _extraExpenseError = 'Enter a type for each extra expense',
+          () => _extraExpenseError = 'Enter a type for each expense line',
         );
         return null;
       }
       final amount = double.tryParse(amountText);
       if (amount == null || amount <= 0) {
         setState(
-          () => _extraExpenseError =
-              'Enter a valid amount for each extra expense',
+          () => _extraExpenseError = 'Enter a valid amount for each expense line',
         );
         return null;
       }
@@ -183,7 +181,7 @@ class _MyClaimScreenState extends ConsumerState<MyClaimScreen> {
       case 'disputed':
         return 'Your manager is reviewing your disputed distance.';
       case 'pending':
-        return 'Submitted — awaiting manager review (advance or extra expenses).';
+        return 'Submitted — awaiting manager review.';
       case 'approved':
         return 'Approved. Net payable reflects manager-approved figures.';
       case 'rejected':
@@ -222,12 +220,11 @@ class _MyClaimScreenState extends ConsumerState<MyClaimScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Claim submitted')));
+      ).showSnackBar(const SnackBar(content: Text('Claim submitted successfully')));
       ref.invalidate(myClaimPreviewProvider);
     } on DioException catch (e) {
       if (!mounted) return;
-      final msg = _dioMessage(e);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_dioMessage(e))));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -263,7 +260,7 @@ class _MyClaimScreenState extends ConsumerState<MyClaimScreen> {
       kmErr = 'Enter a valid distance';
     }
     if (remarks.isEmpty) {
-      remarkErr = 'Remarks are required when you disagree';
+      remarkErr = 'Remarks are required when disputing';
     }
     if (kmErr != null || remarkErr != null) {
       setState(() {
@@ -335,7 +332,7 @@ class _MyClaimScreenState extends ConsumerState<MyClaimScreen> {
     return Scaffold(
       backgroundColor: scheme.surfaceContainerLowest,
       drawer: const AppSideDrawer(),
-      appBar: const SalesGlassAppBar(title: 'My claim', showDrawer: true),
+      appBar: const SalesGlassAppBar(title: 'My Claim', showDrawer: true),
       body: ScreenAccentBackdrop(
         spot: DrawerRouteAccents.myClaim,
         spot2: DrawerRouteAccents.myClaimSky,
@@ -352,7 +349,7 @@ class _MyClaimScreenState extends ConsumerState<MyClaimScreen> {
             final monthStart = (d['monthStart'] ?? '').toString();
             final monthEnd = (d['monthEnd'] ?? '').toString();
             final periodLabel = monthStart.isNotEmpty && monthEnd.isNotEmpty
-                ? '${ClaimFormatters.formatYmdToDmy(monthStart)} to ${ClaimFormatters.formatYmdToDmy(monthEnd)}'
+                ? '${ClaimFormatters.formatYmdToDmy(monthStart)} - ${ClaimFormatters.formatYmdToDmy(monthEnd)}'
                 : '—';
             final canSubmitToday = d['canSubmitToday'] == true;
             final availabilityMsg =
@@ -362,8 +359,8 @@ class _MyClaimScreenState extends ConsumerState<MyClaimScreen> {
 
             final vehicleRaw = (d['vehicleType'] ?? 'two_wheeler').toString();
             final vehicleLabel = vehicleRaw == 'four_wheeler'
-                ? 'Four wheeler'
-                : 'Two wheeler';
+                ? 'Four Wheeler'
+                : 'Two Wheeler';
             final systemKm = d['systemDistanceKm'];
             final rate = d['ratePerKm'];
             final calculated = d['calculatedAmount'];
@@ -376,7 +373,7 @@ class _MyClaimScreenState extends ConsumerState<MyClaimScreen> {
             final headerStatus =
                 (claimStatus != null && claimStatus.trim().isNotEmpty)
                 ? claimStatus.trim()
-                : (claim == null ? 'Not submitted' : '—');
+                : (claim == null ? 'Not Submitted' : '—');
             final statusLower = headerStatus.toLowerCase();
             final canShowSubmitActions =
                 claim == null || statusLower == 'rejected';
@@ -399,45 +396,56 @@ class _MyClaimScreenState extends ConsumerState<MyClaimScreen> {
                 ref.invalidate(myClaimDistanceHistoryProvider);
               },
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [
-                  PremiumFeatureHeader(
-                    icon: Icons.receipt_long_rounded,
-                    title: 'Monthly distance claim',
-                    subtitle:
-                        'Same window as the classic app: submit or dispute during allowed calendar days; amounts use your tracking sessions in the period below.',
-                  ),
                   ClaimAvailabilityBanner(
                     message: availabilityMsg,
                     canSubmitToday: canSubmitToday,
                   ),
-                  PremiumCard(
-                    padding: const EdgeInsets.all(16),
+                  const SizedBox(height: 12),
+
+                  // Hero Modern Overview Card
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          scheme.primaryContainer,
+                          scheme.surfaceContainerHigh,
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Expanded(
-                              child: Text(
-                                ClaimFormatters.formatMonthKey(monthKey),
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w800),
-                              ),
+                            Text(
+                              ClaimFormatters.formatMonthKey(monthKey),
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                             ),
                             PremiumStatusPill(
                               label: headerStatus,
-                              color: ClaimFormatters.statusColor(
-                                scheme,
-                                headerStatus,
-                              ),
-                              icon: Icons.flag_outlined,
+                              color: ClaimFormatters.statusColor(scheme, headerStatus),
+                              icon: Icons.info_outline,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 4),
                         Text(
                           'Period: $periodLabel',
                           style: TextStyle(
@@ -446,326 +454,380 @@ class _MyClaimScreenState extends ConsumerState<MyClaimScreen> {
                           ),
                         ),
                         if (claimId != null && claimId.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              'Reference: $claimId',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: scheme.onSurfaceVariant.withValues(
-                                  alpha: 0.85,
-                                ),
-                              ),
+                          Text(
+                            'Ref: $claimId',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
                             ),
                           ),
-                        if (statusGuidance.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8),
-                            child: Text(
-                              statusGuidance,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: scheme.onSurfaceVariant,
-                                height: 1.35,
+                        const Divider(height: 24),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _MetricTile(
+                                label: 'Calculated Amount',
+                                value: ClaimFormatters.money(calculated),
+                                isHighlight: true,
                               ),
                             ),
-                          ),
+                            Container(height: 36, width: 1, color: scheme.outlineVariant),
+                            Expanded(
+                              child: _MetricTile(
+                                label: 'System Distance',
+                                value: '${systemKm?.toString() ?? "0"} km',
+                              ),
+                            ),
+                          ],
+                        ),
                         const SizedBox(height: 12),
-                        ClaimInfoLine(label: 'Vehicle (current)', value: vehicleLabel),
-                        ClaimInfoLine(
-                          label: 'System distance (km)',
-                          value: systemKm?.toString() ?? '0',
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _MetricTile(
+                                label: 'Vehicle Type',
+                                value: vehicleLabel,
+                              ),
+                            ),
+                            Container(height: 36, width: 1, color: scheme.outlineVariant),
+                            Expanded(
+                              child: _MetricTile(
+                                label: 'Rate / km',
+                                value: ClaimFormatters.money(rate),
+                              ),
+                            ),
+                          ],
                         ),
-                        ClaimInfoLine(
-                          label: 'Rate / km (current)',
-                          value: ClaimFormatters.money(rate),
-                        ),
-                        ClaimInfoLine(
-                          label: 'Calculated amount',
-                          value: ClaimFormatters.money(calculated),
-                          emphasize: claim == null,
-                        ),
+                        if (statusGuidance.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: scheme.surface.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.info_outline, size: 16, color: scheme.primary),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    statusGuidance,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: scheme.onSurface,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
+
                   if (claim != null) ...[
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 16),
                     ClaimDistanceComparisonCard(
                       systemKm: claim['systemDistanceKm'] ?? systemKm,
                       userKm: userKm,
                       approvedKm: approvedKm,
                       ratePerKm: rateSnapshot,
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     ClaimFinancialBreakdownCard(
                       claim: claim,
                       previewCalculatedAmount: calculated,
                       previewSystemKm: systemKm,
                       previewRate: rate,
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     ClaimSnapshotCard(claim: claim),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     ClaimTimestampsCard(claim: claim),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     ClaimRemarksCard(
                       employeeRemarks: remarks,
                       managerRemarks: managerRemarks,
                     ),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 12),
                     ClaimActivityTimeline(claim: claim),
                   ],
-                  const SizedBox(height: 14),
-                  _PastClaimPeriodsCard(highlightMonthKey: monthKey),
+
+                  const SizedBox(height: 16),
+
                   if (canShowSubmitActions) ...[
-                    const SizedBox(height: 14),
-                    PremiumCard(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            'Submit',
-                            style: Theme.of(context).textTheme.titleSmall
-                                ?.copyWith(fontWeight: FontWeight.w800),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            statusLower == 'rejected'
-                                ? 'Your manager rejected this claim. Update and resubmit; the review loop stays open until approval.'
-                                : 'Advance or extra expenses send the claim to your manager first (same as classic app).',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: scheme.onSurfaceVariant,
-                              height: 1.3,
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: BorderSide(color: scheme.outlineVariant),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Submit Monthly Claim',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                  ),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _advanceCtrl,
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            onChanged: (_) {
-                              if (_advanceError != null) {
-                                setState(() => _advanceError = null);
-                              }
-                            },
-                            decoration: InputDecoration(
-                              labelText: 'Advance payment (optional)',
-                              errorText: _advanceError,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
+                            const SizedBox(height: 4),
+                            Text(
+                              statusLower == 'rejected'
+                                  ? 'Your claim was rejected. Please edit details below and resubmit.'
+                                  : 'Enter additional details if applicable before submitting for review.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: scheme.onSurfaceVariant,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Extra expenses (optional)',
-                            style: TextStyle(
-                              fontWeight: FontWeight.w700,
-                              color: scheme.onSurface,
+                            const SizedBox(height: 16),
+                            TextField(
+                              controller: _advanceCtrl,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              onChanged: (_) {
+                                if (_advanceError != null) {
+                                  setState(() => _advanceError = null);
+                                }
+                              },
+                              decoration: InputDecoration(
+                                labelText: 'Advance Payment Received (Optional)',
+                                prefixText: '\$ ',
+                                errorText: _advanceError,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          ...List.generate(_extraDrafts.length, (index) {
-                            final draft = _extraDrafts[index];
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    child: TextField(
-                                      controller: draft.typeCtrl,
-                                      decoration: InputDecoration(
-                                        labelText: 'Type',
-                                        hintText: 'Food, hotel…',
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Extra Expenses',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: scheme.onSurface,
+                                  ),
+                                ),
+                                TextButton.icon(
+                                  onPressed: () => setState(
+                                    () => _extraDrafts.add(_ExtraExpenseDraft()),
+                                  ),
+                                  icon: const Icon(Icons.add, size: 18),
+                                  label: const Text('Add Line'),
+                                ),
+                              ],
+                            ),
+                            ...List.generate(_extraDrafts.length, (index) {
+                              final draft = _extraDrafts[index];
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: scheme.surfaceContainerLow,
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 2,
+                                      child: TextField(
+                                        controller: draft.typeCtrl,
+                                        decoration: const InputDecoration(
+                                          isDense: true,
+                                          labelText: 'Type (e.g. Food)',
+                                          border: InputBorder.none,
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: TextField(
-                                      controller: draft.amountCtrl,
-                                      keyboardType:
-                                          const TextInputType.numberWithOptions(
-                                            decimal: true,
-                                          ),
-                                      decoration: InputDecoration(
-                                        labelText: 'Amount',
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: TextField(
+                                        controller: draft.amountCtrl,
+                                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                        decoration: const InputDecoration(
+                                          isDense: true,
+                                          labelText: 'Amount',
+                                          prefixText: '\$ ',
+                                          border: InputBorder.none,
                                         ),
                                       ),
                                     ),
-                                  ),
-                                  IconButton(
-                                    tooltip: 'Remove',
-                                    onPressed: _extraDrafts.length == 1
+                                    if (_extraDrafts.length > 1)
+                                      IconButton(
+                                        icon: Icon(Icons.cancel, color: scheme.error, size: 20),
+                                        onPressed: () => setState(() {
+                                          final r = _extraDrafts.removeAt(index);
+                                          r.dispose();
+                                        }),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            }),
+                            if (_extraExpenseError != null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: Text(
+                                  _extraExpenseError!,
+                                  style: TextStyle(color: scheme.error, fontSize: 12),
+                                ),
+                              ),
+                            const SizedBox(height: 16),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: FilledButton(
+                                    style: FilledButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                    onPressed: (_agreeSubmitting || _disagreeSubmitting)
                                         ? null
-                                        : () => setState(() {
-                                            final r = _extraDrafts.removeAt(
-                                              index,
-                                            );
-                                            r.dispose();
-                                          }),
-                                    icon: const Icon(
-                                      Icons.remove_circle_outline,
+                                        : () => _submitAgree(
+                                              canSubmitThisClaim,
+                                              availabilityMsg,
+                                              periodLabel,
+                                            ),
+                                    child: Text(_agreeSubmitting ? 'Submitting…' : 'Agree & Submit'),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: OutlinedButton(
+                                    style: OutlinedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                    onPressed: (_agreeSubmitting || _disagreeSubmitting)
+                                        ? null
+                                        : () async {
+                                            if (!canSubmitThisClaim) {
+                                              await _showClaimUnavailableDialog(
+                                                availabilityMessage: availabilityMsg,
+                                                periodLabel: periodLabel,
+                                              );
+                                              return;
+                                            }
+                                            setState(() {
+                                              _showDisputeForm = !_showDisputeForm;
+                                            });
+                                          },
+                                    child: const Text('Dispute Distance'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (_showDisputeForm) ...[
+                              const SizedBox(height: 16),
+                              const Divider(),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _correctedKmCtrl,
+                                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                decoration: InputDecoration(
+                                  labelText: 'Corrected Distance (km)',
+                                  errorText: _correctedKmError,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: _remarksCtrl,
+                                minLines: 2,
+                                maxLines: 4,
+                                decoration: InputDecoration(
+                                  labelText: 'Reason / Remarks',
+                                  errorText: _remarksError,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                width: double.infinity,
+                                child: FilledButton.tonal(
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(vertical: 14),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
                                     ),
                                   ),
-                                ],
-                              ),
-                            );
-                          }),
-                          if (_extraExpenseError != null)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Text(
-                                _extraExpenseError!,
-                                style: TextStyle(
-                                  color: scheme.error,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton.icon(
-                              onPressed: () => setState(
-                                () => _extraDrafts.add(_ExtraExpenseDraft()),
-                              ),
-                              icon: const Icon(Icons.add_rounded),
-                              label: const Text('Add extra expense'),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: FilledButton(
-                                  onPressed:
-                                      (_agreeSubmitting || _disagreeSubmitting)
+                                  onPressed: (_agreeSubmitting || _disagreeSubmitting)
                                       ? null
-                                      : () => _submitAgree(
-                                          canSubmitThisClaim,
-                                          availabilityMsg,
-                                          periodLabel,
-                                        ),
-                                  child: Text(
-                                    _agreeSubmitting ? 'Submitting…' : 'Agree',
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed:
-                                      (_agreeSubmitting || _disagreeSubmitting)
-                                      ? null
-                                      : () async {
-                                          if (!canSubmitThisClaim) {
-                                            await _showClaimUnavailableDialog(
-                                              availabilityMessage:
-                                                  availabilityMsg,
-                                              periodLabel: periodLabel,
-                                            );
-                                            return;
-                                          }
-                                          setState(() {
-                                            _showDisputeForm =
-                                                !_showDisputeForm;
-                                          });
-                                        },
-                                  child: const Text('Disagree'),
+                                      : () => _submitDisagree(
+                                            canSubmitThisClaim,
+                                            availabilityMsg,
+                                            periodLabel,
+                                          ),
+                                  child: Text(_disagreeSubmitting ? 'Submitting…' : 'Submit Dispute'),
                                 ),
                               ),
                             ],
-                          ),
-                          if (_showDisputeForm) ...[
-                            const SizedBox(height: 14),
-                            TextField(
-                              controller: _correctedKmCtrl,
-                              keyboardType:
-                                  const TextInputType.numberWithOptions(
-                                    decimal: true,
-                                  ),
-                              onChanged: (_) {
-                                if (_correctedKmError != null) {
-                                  setState(() => _correctedKmError = null);
-                                }
-                              },
-                              decoration: InputDecoration(
-                                labelText: 'Corrected distance (km)',
-                                errorText: _correctedKmError,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 10),
-                            TextField(
-                              controller: _remarksCtrl,
-                              minLines: 2,
-                              maxLines: 4,
-                              onChanged: (_) {
-                                if (_remarksError != null) {
-                                  setState(() => _remarksError = null);
-                                }
-                              },
-                              decoration: InputDecoration(
-                                labelText: 'Remarks',
-                                errorText: _remarksError,
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            FilledButton.tonal(
-                              onPressed:
-                                  (_agreeSubmitting || _disagreeSubmitting)
-                                  ? null
-                                  : () => _submitDisagree(
-                                      canSubmitThisClaim,
-                                      availabilityMsg,
-                                      periodLabel,
-                                    ),
-                              child: Text(
-                                _disagreeSubmitting
-                                    ? 'Submitting…'
-                                    : 'Submit dispute',
-                              ),
-                            ),
                           ],
-                        ],
-                      ),
-                    ),
-                  ] else ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      'This claim period is already in progress or completed. '
-                      'If it was rejected, you can submit again after the server updates the status.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: scheme.onSurfaceVariant,
-                        height: 1.35,
+                        ),
                       ),
                     ),
                   ],
+
+                  const SizedBox(height: 16),
+                  _PastClaimPeriodsCard(highlightMonthKey: monthKey),
                 ],
               ),
             );
           },
         ),
       ),
+    );
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  const _MetricTile({
+    required this.label,
+    required this.value,
+    this.isHighlight = false,
+  });
+
+  final String label;
+  final String value;
+  final bool isHighlight;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: scheme.onSurfaceVariant,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: isHighlight ? 18 : 15,
+            fontWeight: isHighlight ? FontWeight.w800 : FontWeight.w600,
+            color: isHighlight ? scheme.primary : scheme.onSurface,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -780,168 +842,105 @@ class _PastClaimPeriodsCard extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     final historyAsync = ref.watch(myClaimDistanceHistoryProvider);
 
-    return PremiumCard(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Past claim periods',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Tracked km per claim period — use this when preparing your monthly claim.',
-            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant, height: 1.35),
-          ),
-          const SizedBox(height: 12),
-          historyAsync.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-            ),
-            error: (e, _) => Text(
-              'Could not load distance history.',
-              style: TextStyle(color: scheme.error, fontSize: 13),
-            ),
-            data: (rows) {
-              if (rows.isEmpty) {
-                return Text(
-                  'No distance history yet.',
-                  style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
-                );
-              }
-              return Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          'Month',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 3,
-                        child: Text(
-                          'Period',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          'Km',
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          'Claim',
-                          textAlign: TextAlign.right,
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ],
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: scheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Text(
+              'Past Claim Periods',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
                   ),
-                  const Divider(height: 16),
-                  ...rows.map((row) {
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Historical distance logs for previous claim periods',
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
+            historyAsync.when(
+              loading: () => const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+              error: (e, _) => Text(
+                'Could not load distance history.',
+                style: TextStyle(color: scheme.error, fontSize: 13),
+              ),
+              data: (rows) {
+                if (rows.isEmpty) {
+                  return Text(
+                    'No past claims recorded.',
+                    style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
+                  );
+                }
+                return ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: rows.length,
+                  separatorBuilder: (_, __) => const Divider(height: 12),
+                  itemBuilder: (context, index) {
+                    final row = rows[index];
                     final mk = (row['monthKey'] ?? '').toString();
-                    final start = (row['monthStart'] ?? '').toString();
-                    final end = (row['monthEnd'] ?? '').toString();
                     final km = row['systemDistanceKm'];
                     final status = (row['claimStatus'] ?? '—').toString();
                     final highlight = mk == highlightMonthKey;
-                    final statusColor = status == '—'
-                        ? scheme.onSurfaceVariant
-                        : ClaimFormatters.statusColor(scheme, status);
+
                     return Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
                         color: highlight
-                            ? scheme.primaryContainer.withValues(alpha: 0.45)
+                            ? scheme.primaryContainer.withValues(alpha: 0.3)
                             : Colors.transparent,
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Expanded(
-                            flex: 2,
-                            child: Text(
-                              ClaimFormatters.formatMonthKey(mk),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: highlight ? FontWeight.w800 : FontWeight.w600,
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                ClaimFormatters.formatMonthKey(mk),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: scheme.onSurface,
+                                ),
                               ),
-                            ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '${km ?? 0} km logged',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
                           ),
-                          Expanded(
-                            flex: 3,
-                            child: Text(
-                              start.isNotEmpty && end.isNotEmpty
-                                  ? '${ClaimFormatters.formatYmdToDmy(start)} → ${ClaimFormatters.formatYmdToDmy(end)}'
-                                  : '—',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              km != null ? '${num.tryParse(km.toString())?.toStringAsFixed(2) ?? km}' : '0',
-                              textAlign: TextAlign.right,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            flex: 2,
-                            child: Text(
-                              status,
-                              textAlign: TextAlign.right,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: statusColor,
-                              ),
-                            ),
+                          PremiumStatusPill(
+                            label: status,
+                            color: ClaimFormatters.statusColor(scheme, status),
+                            icon: Icons.flag_outlined,
                           ),
                         ],
                       ),
                     );
-                  }),
-                ],
-              );
-            },
-          ),
-        ],
+                  },
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 }
-
