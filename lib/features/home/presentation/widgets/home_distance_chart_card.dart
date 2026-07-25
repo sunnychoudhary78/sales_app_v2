@@ -72,11 +72,7 @@ class _HomeDistanceChartCardState extends State<HomeDistanceChartCard> {
             subtitle: 'Kilometres logged per day',
             icon: Icons.near_me_rounded,
           ),
-          const SizedBox(height: 14),
-
-          // 1. KPI Summary Cards (Modern Badges)
-        
-          const SizedBox(height: 8),
+          const SizedBox(height: 8),        
 
           // 2. Chart Container
           Container(

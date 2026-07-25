@@ -113,21 +113,13 @@ class _TimelineTile extends StatelessWidget {
                         : scheme.outlineVariant.withValues(alpha: 0.3),
                   ),
                 ),
+                // Clean Dot Node without shadow/glow
                 Container(
                   width: 12,
                   height: 12,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: style.accent,
-                    // Note: Glow here is minimal and part of the node design,
-                    // not the card. Keeping it for visual clarity of the event type.
-                    boxShadow: [
-                      BoxShadow(
-                        color: style.accent.withValues(alpha: 0.4),
-                        blurRadius: 8,
-                        spreadRadius: 2,
-                      ),
-                    ],
                   ),
                 ),
                 Expanded(
@@ -176,7 +168,6 @@ class _ModernEventCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
-        // Simplified ambient shadow, no accent glow
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.1 : 0.04),
@@ -189,14 +180,14 @@ class _ModernEventCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         child: Container(
           decoration: BoxDecoration(
-            // Soft Gradient Surface Background adapted for theme
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
                 scheme.surfaceContainerHigh
                     .withValues(alpha: isDark ? 0.9 : 0.7),
-                scheme.surfaceContainerLow.withValues(alpha: isDark ? 0.6 : 0.4),
+                scheme.surfaceContainerLow
+                    .withValues(alpha: isDark ? 0.6 : 0.4),
               ],
             ),
             border: Border.all(
@@ -207,21 +198,20 @@ class _ModernEventCard extends StatelessWidget {
           child: IntrinsicHeight(
             child: Row(
               children: [
-                // Minimalist Left Accent Bar (Glow Removed)
+                // Minimalist Left Accent Bar
                 Container(
                   width: 4,
                   decoration: BoxDecoration(
                     color: style.accent,
                   ),
                 ),
-                // Main Content Body
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.all(14),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Icon Container (Adapted for theme, glow removed)
+                        // Icon Container
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
@@ -240,7 +230,6 @@ class _ModernEventCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        // Details Column
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -294,7 +283,7 @@ class _ModernEventCard extends StatelessWidget {
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 10,
                                     vertical: 4,
-                                 ),
+                                  ),
                                   decoration: BoxDecoration(
                                     color: scheme.surfaceContainerHighest
                                         .withValues(alpha: 0.5),

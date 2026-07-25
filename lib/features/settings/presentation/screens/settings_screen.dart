@@ -39,8 +39,9 @@ class SettingsScreen extends ConsumerWidget {
         spot: DrawerRouteAccents.settings,
         spot2: DrawerRouteAccents.settingsSlate,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 16, 18, 28),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
           children: [
+            // --- Section 1: Organization Header ---
             PremiumFeatureHeader(
               icon: Icons.apartment_rounded,
               title: 'Organization',
@@ -49,7 +50,8 @@ class SettingsScreen extends ConsumerWidget {
                   : 'Company linked to your mobile account.',
             ),
             const SizedBox(height: 12),
-            PremiumCard(
+            _buildCard(
+              context: context,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -90,7 +92,10 @@ class SettingsScreen extends ConsumerWidget {
                 ],
               ),
             ),
+
             const SizedBox(height: 20),
+
+            // --- Section 2: Look & feel Header ---
             PremiumFeatureHeader(
               icon: Icons.palette_outlined,
               title: 'Look & feel',
@@ -98,7 +103,10 @@ class SettingsScreen extends ConsumerWidget {
                   'Theme mode and primary seed stay dynamic; accents below add character per screen.',
             ),
             const SizedBox(height: 12),
-            PremiumCard(
+
+            // --- Theme Mode Switcher ---
+            _buildCard(
+              context: context,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -124,7 +132,10 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 12),
-            PremiumCard(
+
+            // --- Primary Color Swatches ---
+            _buildCard(
+              context: context,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -142,7 +153,8 @@ class SettingsScreen extends ConsumerWidget {
                       final selected = c.toARGB32() == primary.toARGB32();
                       return GestureDetector(
                         onTap: () => ref.read(appThemeProvider.notifier).setPrimaryColor(c),
-                        child: Container(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
                           width: 40,
                           height: 40,
                           decoration: BoxDecoration(
@@ -177,6 +189,25 @@ class SettingsScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+
+  /// Modern Rounded Premium Card wrapper
+  Widget _buildCard({required BuildContext context, required Widget child}) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerHigh.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: child,
     );
   }
 

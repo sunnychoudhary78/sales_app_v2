@@ -19,12 +19,6 @@ class DashboardAppBarTitle extends StatelessWidget {
     return name.split(" ").first;
   }
 
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour < 12) return "Good Morning";
-    if (hour < 17) return "Good Afternoon";
-    return "Good Evening";
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,17 +31,7 @@ class DashboardAppBarTitle extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Greeting Tagline
-              Text(
-                _getGreeting().toUpperCase(),
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1.2,
-                  color: scheme.primary,
-                ),
-              ),
-              const SizedBox(height: 2),
+           
               // User First Name Greeting
               Text(
                 "Hi, $_firstName 👋",

@@ -150,15 +150,6 @@ class HomeTrackingDashboardHero extends StatelessWidget {
                                   color: _RouteAccent.deep.withValues(alpha: 0.50),
                                   width: 5,
                                 ),
-                                // boxShadow: [
-                                //   BoxShadow(
-                                //     color: _RouteAccent.teal.withValues(
-                                //       alpha: isDark ? 0.25 : 0.12,
-                                //     ),
-                                //     blurRadius: 14,
-                                //     spreadRadius: 2,
-                                //   ),
-                                // ],
                               ),
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,

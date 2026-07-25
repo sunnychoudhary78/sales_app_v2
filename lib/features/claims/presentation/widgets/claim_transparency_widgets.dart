@@ -258,14 +258,14 @@ class ClaimFinancialBreakdownCard extends StatelessWidget {
       children: [
         Text(
           'Financial breakdown',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 fontWeight: FontWeight.w800,
               ),
         ),
         const SizedBox(height: 4),
         Text(
           'Distance × rate + extra expenses − advance = net payable',
-          style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant, height: 1.3),
+          style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant, height: 1.3),
         ),
         const SizedBox(height: 12),
         ClaimInfoLine(
@@ -284,7 +284,7 @@ class ClaimFinancialBreakdownCard extends StatelessWidget {
                 Text(
                   'Extra expenses (+${ClaimFormatters.money(extraTotal)})',
                   style: TextStyle(
-                    fontSize: 12,
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
                     color: scheme.primary,
                   ),
@@ -436,7 +436,7 @@ class ClaimSnapshotCard extends StatelessWidget {
         Text(
           'Vehicle and rate frozen when this claim was submitted.',
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 14,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
@@ -534,7 +534,7 @@ class ClaimActivityTimeline extends StatelessWidget {
       ),
       subtitle: Text(
         'Every submission, dispute, and manager action',
-        style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+        style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
       ),
       children: [
         for (var i = 0; i < entries.length; i++) ...[
@@ -595,8 +595,8 @@ class _ClaimChatEntryTile extends StatelessWidget {
                 child: Text(
                   role,
                   style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                     color: isManager
                         ? scheme.onSecondaryContainer
                         : scheme.onPrimaryContainer,
@@ -608,7 +608,7 @@ class _ClaimChatEntryTile extends StatelessWidget {
                 child: Text(
                   action.toUpperCase(),
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 14,
                     fontWeight: FontWeight.w800,
                     color: scheme.onSurface,
                   ),
@@ -616,7 +616,7 @@ class _ClaimChatEntryTile extends StatelessWidget {
               ),
               Text(
                 at,
-                style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant),
+                style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
               ),
             ],
           ),
@@ -625,25 +625,25 @@ class _ClaimChatEntryTile extends StatelessWidget {
               padding: const EdgeInsets.only(top: 4),
               child: Text(
                 'Status → $status',
-                style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+                style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
               ),
             ),
           if (distance != null)
             Text(
               'Distance: ${num.tryParse(distance.toString())?.toStringAsFixed(2) ?? distance} km',
-              style: TextStyle(fontSize: 12, color: scheme.onSurface),
+              style: TextStyle(fontSize: 14, color: scheme.onSurface),
             ),
           if (amount != null)
             Text(
               'Amount: ${ClaimFormatters.money(amount)}',
-              style: TextStyle(fontSize: 12, color: scheme.onSurface),
+              style: TextStyle(fontSize: 14, color: scheme.onSurface),
             ),
           if (net != null)
             Text(
               'Net: ${ClaimFormatters.money(net)}',
               style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
                 color: scheme.primary,
               ),
             ),
@@ -653,7 +653,7 @@ class _ClaimChatEntryTile extends StatelessWidget {
               child: Text(
                 remarks.trim(),
                 style: TextStyle(
-                  fontSize: 12,
+                  fontSize: 14,
                   fontStyle: FontStyle.italic,
                   color: scheme.onSurfaceVariant,
                   height: 1.35,
@@ -700,7 +700,7 @@ class ClaimRemarksCard extends StatelessWidget {
           Text(
             'Employee',
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 14,
               fontWeight: FontWeight.w800,
               color: scheme.primary,
             ),
@@ -708,7 +708,7 @@ class ClaimRemarksCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             emp,
-            style: TextStyle(fontSize: 13, color: scheme.onSurface, height: 1.35),
+            style: TextStyle(fontSize: 14, color: scheme.onSurface, height: 1.35),
           ),
         ],
         if (emp.isNotEmpty && mgr.isNotEmpty) const SizedBox(height: 12),

@@ -653,7 +653,7 @@ class _MyClaimScreenState extends ConsumerState<MyClaimScreen> {
                                         decoration: const InputDecoration(
                                           isDense: true,
                                           labelText: 'Amount',
-                                          prefixText: '\$ ',
+                                          prefixText: '\₹',
                                           border: InputBorder.none,
                                         ),
                                       ),
@@ -920,7 +920,7 @@ class _PastClaimPeriodsCard extends ConsumerWidget {
                               Text(
                                 '${km ?? 0} km logged',
                                 style: TextStyle(
-                                  fontSize: 12,
+                                  fontSize: 14,
                                   color: scheme.onSurfaceVariant,
                                 ),
                               ),
