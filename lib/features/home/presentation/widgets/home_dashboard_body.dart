@@ -151,7 +151,7 @@ class _ErrorInsightCard extends StatelessWidget {
         style: TextStyle(
           color: scheme.onErrorContainer,
           fontWeight: FontWeight.w600,
-          fontSize: 13,
+          fontSize: 14,
         ),
       ),
     );
@@ -186,7 +186,7 @@ class _InsightsLockedCard extends StatelessWidget {
             child: Text(
               msg,
               style: TextStyle(
-                fontSize: 13,
+                fontSize: 15,
                 height: 1.35,
                 color: scheme.onSurface.withValues(alpha: 0.75),
                 fontWeight: FontWeight.w600,

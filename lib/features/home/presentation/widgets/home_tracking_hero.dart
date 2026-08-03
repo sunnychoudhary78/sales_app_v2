@@ -174,7 +174,7 @@ class HomeTrackingDashboardHero extends StatelessWidget {
                                   Text(
                                     "KM",
                                     style: GoogleFonts.inter(
-                                      fontSize: 11,
+                                      fontSize: 13,
                                       fontWeight: FontWeight.w800,
                                       letterSpacing: 0.5,
                                       color: _RouteAccent.teal,
@@ -333,7 +333,7 @@ class _DashboardTile extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
                     fontWeight: FontWeight.w600,
-                    fontSize: 11,
+                    fontSize: 13,
                     color: scheme.onSurfaceVariant,
                   ),
                 ),

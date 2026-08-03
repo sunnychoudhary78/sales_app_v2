@@ -443,7 +443,7 @@ class _DrawerNavTile extends StatelessWidget {
                 child: Text(
                   entry.title,
                   style: GoogleFonts.inter(
-                    fontSize: 18, // Original font size restored
+                    fontSize: 20, // Original font size restored
                     fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                     letterSpacing: -0.2,
                     color: selected ? activeFg : scheme.onSurface,

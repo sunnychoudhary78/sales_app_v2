@@ -133,7 +133,7 @@ class _HomeLiveTrackingCardState extends State<HomeLiveTrackingCard>
                     Text(
                       'Started $startTimeStr',
                       style: GoogleFonts.inter(
-                        fontSize: 11.5,
+                        fontSize: 13,
                         color: scheme.onSurfaceVariant,
                       ),
                     ),
@@ -193,7 +193,7 @@ class _HomeLiveTrackingCardState extends State<HomeLiveTrackingCard>
                   child: Text(
                     widget.live.locationOffReason!,
                     style: GoogleFonts.inter(
-                      fontSize: 12,
+                      fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: scheme.onErrorContainer,
                     ),
@@ -242,7 +242,7 @@ class _HomeLiveTrackingCardState extends State<HomeLiveTrackingCard>
                   Text(
                     'STANDBY',
                     style: GoogleFonts.inter(
-                      fontSize: 10,
+                      fontSize: 12,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 0.8,
                       color: _LiveCardAccent.amber,

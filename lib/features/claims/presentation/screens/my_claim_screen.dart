@@ -450,14 +450,14 @@ class _MyClaimScreenState extends ConsumerState<MyClaimScreen> {
                           'Period: $periodLabel',
                           style: TextStyle(
                             color: scheme.onSurfaceVariant,
-                            fontSize: 13,
+                            fontSize: 14,
                           ),
                         ),
                         if (claimId != null && claimId.isNotEmpty)
                           Text(
                             'Ref: $claimId',
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 13,
                               color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
                             ),
                           ),
@@ -514,7 +514,7 @@ class _MyClaimScreenState extends ConsumerState<MyClaimScreen> {
                                   child: Text(
                                     statusGuidance,
                                     style: TextStyle(
-                                      fontSize: 12,
+                                      fontSize: 14,
                                       color: scheme.onSurface,
                                     ),
                                   ),
@@ -581,7 +581,7 @@ class _MyClaimScreenState extends ConsumerState<MyClaimScreen> {
                                   ? 'Your claim was rejected. Please edit details below and resubmit.'
                                   : 'Enter additional details if applicable before submitting for review.',
                               style: TextStyle(
-                                fontSize: 12,
+                                fontSize: 14,
                                 color: scheme.onSurfaceVariant,
                               ),
                             ),
@@ -675,7 +675,7 @@ class _MyClaimScreenState extends ConsumerState<MyClaimScreen> {
                                 padding: const EdgeInsets.only(bottom: 8),
                                 child: Text(
                                   _extraExpenseError!,
-                                  style: TextStyle(color: scheme.error, fontSize: 12),
+                                  style: TextStyle(color: scheme.error, fontSize: 14),
                                 ),
                               ),
                             const SizedBox(height: 16),
@@ -813,7 +813,7 @@ class _MetricTile extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 14,
             color: scheme.onSurfaceVariant,
             fontWeight: FontWeight.w500,
           ),
@@ -861,7 +861,7 @@ class _PastClaimPeriodsCard extends ConsumerWidget {
             const SizedBox(height: 4),
             Text(
               'Historical distance logs for previous claim periods',
-              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+              style: TextStyle(fontSize: 14, color: scheme.onSurfaceVariant),
             ),
             const SizedBox(height: 16),
             historyAsync.when(
@@ -873,7 +873,7 @@ class _PastClaimPeriodsCard extends ConsumerWidget {
               ),
               error: (e, _) => Text(
                 'Could not load distance history.',
-                style: TextStyle(color: scheme.error, fontSize: 13),
+                style: TextStyle(color: scheme.error, fontSize: 14),
               ),
               data: (rows) {
                 if (rows.isEmpty) {

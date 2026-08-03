@@ -813,7 +813,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
                   ),
                   labelColor: scheme.onPrimary,
                   unselectedLabelColor: scheme.onSurfaceVariant,
-                  labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                  labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                   tabs: const [
                     Tab(text: '1. Location'),
                     Tab(text: '2. Contact'),
@@ -862,7 +862,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
                                     Text(
                                       _placeHeadline ?? 'Location Status',
                                       style: TextStyle(
-                                        fontSize: 13,
+                                        fontSize: 15,
                                         fontWeight: FontWeight.bold,
                                         color: scheme.onSurface,
                                       ),
@@ -872,7 +872,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
                                     const SizedBox(height: 2),
                                     Text(
                                       _locationStatus,
-                                      style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+                                      style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -899,7 +899,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('PARTY DETAILS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: scheme.primary, letterSpacing: 0.5)),
+                              Text('PARTY DETAILS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: scheme.primary, letterSpacing: 0.5)),
                               const SizedBox(height: 14),
                               Row(
                                 children: [
@@ -907,8 +907,8 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
                                     child: _buildSegmentedPill<bool>(
                                       selected: _isClient,
                                       segments: const [
-                                        ButtonSegment(value: true, label: Text('Client', style: TextStyle(fontSize: 12))),
-                                        ButtonSegment(value: false, label: Text('Contractor', style: TextStyle(fontSize: 12))),
+                                        ButtonSegment(value: true, label: Text('Client', style: TextStyle(fontSize: 15))),
+                                        ButtonSegment(value: false, label: Text('Contractor', style: TextStyle(fontSize: 15))),
                                       ],
                                       onSelectionChanged: (s) => setState(() => _isClient = s.first),
                                     ),
@@ -918,8 +918,8 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
                                     child: _buildSegmentedPill<bool>(
                                       selected: _isNewVisit,
                                       segments: const [
-                                        ButtonSegment(value: true, label: Text('New Visit', style: TextStyle(fontSize: 12))),
-                                        ButtonSegment(value: false, label: Text('Followup', style: TextStyle(fontSize: 12))),
+                                        ButtonSegment(value: true, label: Text('New Visit', style: TextStyle(fontSize: 15))),
+                                        ButtonSegment(value: false, label: Text('Followup', style: TextStyle(fontSize: 15))),
                                       ],
                                       onSelectionChanged: (s) {
                                         final next = s.first;
@@ -971,10 +971,10 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
                                       Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text('Visit Time', style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant)),
+                                          Text('Visit Time', style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
                                           Text(
                                             DateFormat('EEE, dd MMM yyyy · hh:mm a').format(_visitWhen),
-                                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+                                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
                                           ),
                                         ],
                                       ),
@@ -993,7 +993,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('ADDRESS DETAILS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: scheme.primary, letterSpacing: 0.5)),
+                              Text('ADDRESS DETAILS', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: scheme.primary, letterSpacing: 0.5)),
                               const SizedBox(height: 14),
                               Row(
                                 children: [
@@ -1002,7 +1002,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
                                       value: _selectedState,
                                       isExpanded: true,
                                       decoration: _fieldDec('State'),
-                                      hint: const Text('State', style: TextStyle(fontSize: 12)),
+                                      hint: const Text('State', style: TextStyle(fontSize: 14)),
                                       items: _indianStates
                                           .map((s) => DropdownMenuItem(value: s, child: Text(s, style: const TextStyle(fontSize: 12))))
                                           .toList(),
@@ -1052,7 +1052,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('PRIMARY CONTACT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: scheme.primary, letterSpacing: 0.5)),
+                              Text('PRIMARY CONTACT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: scheme.primary, letterSpacing: 0.5)),
                               const SizedBox(height: 14),
                               TextFormField(
                                 controller: _contactNameCtrl,
@@ -1113,7 +1113,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('VISIT PURPOSE & FEEDBACK', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: scheme.primary, letterSpacing: 0.5)),
+                              Text('VISIT PURPOSE & FEEDBACK', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: scheme.primary, letterSpacing: 0.5)),
                               const SizedBox(height: 14),
                               TextFormField(
                                 controller: _purposeCtrl,
@@ -1162,7 +1162,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
                                                       style: TextStyle(
                                                         fontWeight: FontWeight.bold,
                                                         color: _ratingColor(n),
-                                                        fontSize: 12,
+                                                        fontSize: 14,
                                                       ),
                                                     ),
                                                   ),
@@ -1237,7 +1237,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
                                             ? 'Set Follow-up Date'
                                             : 'Follow-up: ${DateFormat('dd MMM yyyy').format(_followUpDate!)}',
                                         style: TextStyle(
-                                          fontSize: 12,
+                                          fontSize: 16,
                                           fontWeight: _followUpDate == null ? FontWeight.normal : FontWeight.bold,
                                           color: _followUpDate == null ? scheme.onSurfaceVariant : scheme.primary,
                                         ),
@@ -1263,7 +1263,7 @@ class _AddVisitScreenState extends ConsumerState<AddVisitScreen>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('PHOTO PROOF', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: scheme.primary, letterSpacing: 0.5)),
+                              Text('PHOTO PROOF', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: scheme.primary, letterSpacing: 0.5)),
                               const SizedBox(height: 14),
                               Container(
                                 height: 130,

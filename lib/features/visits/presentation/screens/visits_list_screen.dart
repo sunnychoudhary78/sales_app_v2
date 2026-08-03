@@ -308,7 +308,7 @@ class _VisitsListScreenState extends ConsumerState<VisitsListScreen> {
                           Text(
                             visit.isNewVisit ? 'New Visit' : 'Follow-up',
                             style: TextStyle(
-                              fontSize: 12,
+                              fontSize: 14,
                               fontWeight: FontWeight.bold,
                               color: visit.isNewVisit
                                   ? scheme.onPrimaryContainer
@@ -811,7 +811,7 @@ class _FilterChip extends StatelessWidget {
           label,
           style: TextStyle(
             fontWeight: selected ? FontWeight.bold : FontWeight.w500,
-            fontSize: 13,
+            fontSize: 14,
             color: selected ? scheme.onPrimaryContainer : scheme.onSurface,
           ),
         ),
@@ -944,7 +944,7 @@ class _VisitCard extends StatelessWidget {
                         child: Text(
                           visit.isNewVisit ? 'NEW' : 'F/U',
                           style: TextStyle(
-                            fontSize: 9,
+                            fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: visit.isNewVisit ? scheme.onPrimary : scheme.onTertiary,
                           ),
@@ -1044,7 +1044,7 @@ class _VisitCard extends StatelessWidget {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                   color: scheme.secondary,
                                 ),
@@ -1056,7 +1056,7 @@ class _VisitCard extends StatelessWidget {
                           Text(
                             DateFormat('dd MMM · h:mm a').format(visit.visitDate),
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 14,
                               color: scheme.onSurfaceVariant.withValues(alpha: 0.8),
                               fontWeight: FontWeight.w500,
                             ),
@@ -1156,7 +1156,7 @@ class _SheetRow extends StatelessWidget {
               Text(
                 label,
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: scheme.onSurfaceVariant,
                 ),

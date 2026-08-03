@@ -393,7 +393,7 @@ class _EmptyStateView extends StatelessWidget {
           Text(
             'No recent activity',
             style: GoogleFonts.inter(
-              fontSize: 14,
+              fontSize: 16,
               fontWeight: FontWeight.w600,
               color: scheme.onSurface,
             ),

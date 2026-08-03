@@ -64,7 +64,7 @@ class HomeWelcomeHeader extends StatelessWidget {
           Text(
             subtitle,
             style: GoogleFonts.inter(
-              fontSize: 13,
+              fontSize: 14,
               fontWeight: FontWeight.w500,
               height: 1.35,
               color: scheme.onPrimary.withValues(alpha: 0.85),

@@ -115,7 +115,7 @@ class _HomeDistanceChartCardState extends State<HomeDistanceChartCard> {
                           return Text(
                             value.toInt().toString(),
                             style: GoogleFonts.inter(
-                              fontSize: 10,
+                              fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: scheme.onSurface.withValues(alpha: 0.4),
                             ),
@@ -138,7 +138,7 @@ class _HomeDistanceChartCardState extends State<HomeDistanceChartCard> {
                             child: Text(
                               _shortDate(data[idx].date),
                               style: GoogleFonts.inter(
-                                fontSize: 9,
+                                fontSize: 13,
                                 fontWeight: _touchedIndex == idx ? FontWeight.w800 : FontWeight.w500,
                                 color: _touchedIndex == idx
                                     ? _KmTrackAccent.teal
@@ -231,7 +231,7 @@ class _HomeDistanceChartCardState extends State<HomeDistanceChartCard> {
                     Text(
                       _longDate(selectedPoint.date),
                       style: GoogleFonts.inter(
-                        fontSize: 12,
+                        fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: scheme.onSurface,
                       ),
@@ -243,7 +243,7 @@ class _HomeDistanceChartCardState extends State<HomeDistanceChartCard> {
                     Text(
                       '${selectedPoint.distanceKm.toStringAsFixed(2)} km',
                       style: GoogleFonts.inter(
-                        fontSize: 13,
+                        fontSize: 14,
                         fontWeight: FontWeight.w800,
                         color: _KmTrackAccent.teal,
                       ),
@@ -251,7 +251,7 @@ class _HomeDistanceChartCardState extends State<HomeDistanceChartCard> {
                     Text(
                       '  •  ${selectedPoint.visits} visits',
                       style: GoogleFonts.inter(
-                        fontSize: 12,
+                        fontSize: 14,
                         fontWeight: FontWeight.w500,
                         color: scheme.onSurfaceVariant,
                       ),
@@ -303,7 +303,7 @@ class _HomeDistanceChartCardState extends State<HomeDistanceChartCard> {
                 Text(
                   label,
                   style: GoogleFonts.inter(
-                    fontSize: 10,
+                    fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: scheme.onSurfaceVariant,
                   ),
@@ -314,7 +314,7 @@ class _HomeDistanceChartCardState extends State<HomeDistanceChartCard> {
             Text(
               value,
               style: GoogleFonts.inter(
-                fontSize: 12,
+                fontSize: 14,
                 fontWeight: FontWeight.w800,
                 color: isHighlight ? _KmTrackAccent.deep : scheme.onSurface,
               ),

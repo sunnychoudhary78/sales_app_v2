@@ -585,7 +585,7 @@ class _StatusBadge extends StatelessWidget {
       child: Text(
         status.toUpperCase(),
         style: TextStyle(
-          fontSize: 10,
+          fontSize:13,
           fontWeight: FontWeight.bold,
           color: fgColor,
           letterSpacing: 0.5,
