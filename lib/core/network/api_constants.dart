@@ -1,7 +1,7 @@
 class ApiConstants {
   static const String baseUrl =
-     // 'http://88.222.244.233/uat-salesvisitpro-admin/api';
-    'https://sales.immortaltechnovation.com/sales-api/api';
+     'http://88.222.244.233/uat-salesvisitpro-admin/api';
+    //'https://sales.immortaltechnovation.com/sales-api/api';
 
   static const String login = '/auth/login';
   static const String loginOtpRequest = '/auth/login-otp-request';

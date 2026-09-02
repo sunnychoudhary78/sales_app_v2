@@ -2,7 +2,9 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-/// Frosted glass card shared by password / OTP / forgot flows on the login screen.
+/// Modern theme-aware authentication shell.
+/// Automatically adapts to Light / Dark / System mode
+/// and uses the app ColorScheme.
 class LoginGlassAuthShell extends StatelessWidget {
   const LoginGlassAuthShell({
     super.key,
@@ -17,31 +19,69 @@ class LoginGlassAuthShell extends StatelessWidget {
   final VoidCallback? onBack;
   final String? headerTitle;
 
-  static InputDecorationTheme inputTheme(ColorScheme scheme) {
-    final inputFill = Colors.white.withValues(alpha: 0.06);
-    final inputBorder = Colors.white.withValues(alpha: 0.22);
+  static InputDecorationTheme inputTheme(
+    ColorScheme scheme,
+    Brightness brightness,
+  ) {
+    final isDark = brightness == Brightness.dark;
+
+    final inputFill = isDark
+        ? scheme.surfaceContainerHighest.withOpacity(0.55)
+        : scheme.surfaceContainerHighest.withOpacity(0.65);
+
     return InputDecorationTheme(
       filled: true,
       fillColor: inputFill,
-      labelStyle: const TextStyle(color: Color(0xFFE5E7EB)),
-      hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.55)),
-      prefixIconColor: const Color(0xFFD1D5DB),
-      suffixIconColor: const Color(0xFFD1D5DB),
+
+      labelStyle: TextStyle(
+        color: scheme.onSurfaceVariant,
+      ),
+
+      hintStyle: TextStyle(
+        color: scheme.onSurfaceVariant.withOpacity(0.65),
+      ),
+
+      prefixIconColor: scheme.primary,
+      suffixIconColor: scheme.onSurfaceVariant,
+
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 18,
+        vertical: 18,
+      ),
+
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide.none,
+      ),
+
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: inputBorder),
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(
+          color: scheme.outlineVariant.withOpacity(0.55),
+        ),
       ),
+
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: scheme.primary, width: 1.2),
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(
+          color: scheme.primary,
+          width: 1.8,
+        ),
       ),
+
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFF87171)),
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(
+          color: scheme.error,
+        ),
       ),
+
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFF87171), width: 1.2),
+        borderRadius: BorderRadius.circular(18),
+        borderSide: BorderSide(
+          color: scheme.error,
+          width: 1.8,
+        ),
       ),
     );
   }
@@ -50,87 +90,148 @@ class LoginGlassAuthShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final panelColor = Color.lerp(scheme.primary, Colors.black, 0.84)!.withValues(alpha: 0.48);
-    const textColor = Colors.white;
+    final isDark = theme.brightness == Brightness.dark;
+
+    /// Theme-aware glass surface
+    final panelColor = isDark
+        ? scheme.surface.withOpacity(0.82)
+        : scheme.surface.withOpacity(0.90);
+
+    final borderColor = isDark
+        ? scheme.outlineVariant.withOpacity(0.40)
+        : scheme.outlineVariant.withOpacity(0.65);
+
+    final shadowColor = isDark
+        ? Colors.black.withOpacity(0.28)
+        : scheme.primary.withOpacity(0.10);
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(32),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        filter: ImageFilter.blur(
+          sigmaX: 14,
+          sigmaY: 14,
+        ),
         child: Container(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(32),
             color: panelColor,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-            boxShadow: const [
+            border: Border.all(
+              color: borderColor,
+            ),
+            boxShadow: [
               BoxShadow(
-                color: Color(0x33000000),
-                blurRadius: 24,
-                offset: Offset(0, 10),
+                color: shadowColor,
+                blurRadius: 40,
+                offset: const Offset(0, 20),
               ),
             ],
           ),
+
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+            padding: const EdgeInsets.fromLTRB(
+              28,
+              24,
+              28,
+              28,
+            ),
+
             child: Theme(
               data: theme.copyWith(
-                inputDecorationTheme: inputTheme(scheme),
+                inputDecorationTheme: inputTheme(
+                  scheme,
+                  theme.brightness,
+                ),
               ),
+
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  /// Back button for OTP / Forgot Password
                   if (showBack && onBack != null) ...[
                     Row(
                       children: [
-                        IconButton(
-                          onPressed: onBack,
-                          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                          color: textColor.withValues(alpha: 0.92),
-                          tooltip: 'Back',
+                        Container(
+                          decoration: BoxDecoration(
+                            color: scheme.surfaceContainerHighest,
+                            shape: BoxShape.circle,
+                          ),
+                          child: IconButton(
+                            onPressed: onBack,
+                            icon: Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              color: scheme.onSurface,
+                              size: 18,
+                            ),
+                            tooltip: 'Back',
+                          ),
                         ),
+
+                        const SizedBox(width: 12),
+
                         Expanded(
                           child: Text(
                             headerTitle ?? '',
                             style: theme.textTheme.titleMedium?.copyWith(
-                              color: textColor,
+                              color: scheme.onSurface,
                               fontWeight: FontWeight.w800,
-                              letterSpacing: -0.2,
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+
+                    const SizedBox(height: 18),
                   ],
-                  SizedBox(
-                    height: 70,
-                    child: Image.asset(
-                      'assets/logo.png',
-                      fit: BoxFit.contain,
+
+                  /// Logo
+                  Center(
+                    child: Container(
+                      width: 78,
+                      height: 78,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: scheme.primary.withOpacity(
+                          isDark ? 0.16 : 0.10,
+                        ),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Image.asset(
+                        'assets/logo.png',
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+
+                  const SizedBox(height: 14),
+
+                  /// App Name
                   Text(
                     'IMT-Tracking',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
-                      color: textColor,
-                      letterSpacing: 4,
+                      color: scheme.onSurface,
+                      letterSpacing: 1.2,
                     ),
                   ),
-                  const SizedBox(height: 6),
+
+                  const SizedBox(height: 4),
+
+                  /// Tagline
                   Text(
-                    'Track. Perform. Grow',
+                    'Track. Perform. Grow.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.86),
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.2,
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 12),
+
+                  const SizedBox(height: 26),
+
+                  /// Password / OTP / Forgot Panel
                   child,
                 ],
               ),

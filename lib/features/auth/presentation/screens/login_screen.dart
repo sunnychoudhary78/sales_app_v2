@@ -13,11 +13,7 @@ import '../widgets/login_password_panel.dart';
 import '../widgets/login_tracking_background.dart';
 
 /// Which auth form is shown inside the shared login shell.
-enum LoginAuthPage {
-  password,
-  otp,
-  forgot,
-}
+enum LoginAuthPage { password, otp, forgot }
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key, this.initialPage = LoginAuthPage.password});
@@ -57,8 +53,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     )..repeat();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final msg =
-          await ref.read(authProvider.notifier).consumeSubscriptionInactiveMessage();
+      final msg = await ref
+          .read(authProvider.notifier)
+          .consumeSubscriptionInactiveMessage();
       if (!mounted || msg == null || msg.isEmpty) return;
       setState(() => _subscriptionBanner = msg);
     });
@@ -105,10 +102,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loginError = '');
     try {
-      await ref.read(authProvider.notifier).loginWithPassword(
-            login: loginCtrl.text,
-            password: passCtrl.text,
-          );
+      await ref
+          .read(authProvider.notifier)
+          .loginWithPassword(login: loginCtrl.text, password: passCtrl.text);
     } catch (e) {
       if (!mounted) return;
       setState(() => _loginError = formatUserFacingError(e));
@@ -132,7 +128,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           hidePassword: _hidePassword,
           loginError: _loginError,
           isLoading: ref.watch(authProvider).isAuthenticating,
-          onTogglePassword: () => setState(() => _hidePassword = !_hidePassword),
+          onTogglePassword: () =>
+              setState(() => _hidePassword = !_hidePassword),
           onSubmit: _submit,
           onLoginWithOtp: () {
             setState(() => _loginError = '');
@@ -155,10 +152,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         return Stack(
           alignment: Alignment.topCenter,
           clipBehavior: Clip.hardEdge,
-          children: <Widget>[
-            ...previous,
-            ?current,
-          ],
+          children: <Widget>[...previous, ?current],
         );
       },
       transitionBuilder: (child, animation) {
@@ -186,30 +180,121 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.sizeOf(context).width >= 940;
-    final maxCardHeight = math.min(
-      480.0,
-      math.max(320.0, MediaQuery.sizeOf(context).height * 0.46),
-    );
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final brightness = theme.brightness;
+    final size = MediaQuery.sizeOf(context);
+
+    final isWide = size.width >= 940;
+    final isDark = brightness == Brightness.dark;
+
+    final primary = colorScheme.primary;
+    final secondary = colorScheme.secondary;
+    final surface = colorScheme.surface;
+
+    final backgroundStart = isDark
+        ? Color.alphaBlend(primary.withOpacity(0.20), const Color(0xFF0B1020))
+        : Color.alphaBlend(primary.withOpacity(0.12), surface);
+
+    final backgroundEnd = isDark
+        ? const Color(0xFF111827)
+        : colorScheme.surface;
+
+    final maxCardHeight = math.min(500.0, math.max(320.0, size.height * 0.52));
 
     final shell = RepaintBoundary(
-      child: LoginGlassAuthShell(
-        showBack: _pageIndex != 0,
-        onBack: _pageIndex == 0 ? null : () => _goPassword(resetAux: true),
-        headerTitle: _shellTitle,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: maxCardHeight),
-          child: _animatedPanelSwitcher(),
+      child: Container(
+        decoration: BoxDecoration(
+          color: surface.withOpacity(isDark ? 0.72 : 0.88),
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withOpacity(isDark ? 0.35 : 0.55),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: primary.withOpacity(isDark ? 0.16 : 0.10),
+              blurRadius: 40,
+              offset: const Offset(0, 20),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(32),
+          child: LoginGlassAuthShell(
+            showBack: _pageIndex != 0,
+            onBack: _pageIndex == 0 ? null : () => _goPassword(resetAux: true),
+            headerTitle: _shellTitle,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxCardHeight),
+              child: _animatedPanelSwitcher(),
+            ),
+          ),
         ),
       ),
     );
 
     return Scaffold(
+      backgroundColor: backgroundEnd,
       body: Stack(
         children: [
+          /// Main theme gradient background
           Positioned.fill(
-            child: LoginTrackingBackground(animation: _bgCtrl),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    backgroundStart,
+                    backgroundEnd,
+                    isDark ? const Color(0xFF0B1020) : colorScheme.surface,
+                  ],
+                ),
+              ),
+            ),
           ),
+
+          /// Top abstract shape like reference image
+          Positioned(
+            top: -size.width * 0.25,
+            right: -size.width * 0.25,
+            child: IgnorePointer(
+              child: Transform.rotate(
+                angle: -0.35,
+                child: Container(
+                  width: isWide ? 420 : size.width * 0.75,
+                  height: isWide ? 300 : size.width * 0.55,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(100),
+                    gradient: LinearGradient(
+                      colors: [
+                        primary.withOpacity(0.85),
+                        secondary.withOpacity(0.55),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          /// Bottom decorative glow
+          Positioned(
+            bottom: -120,
+            left: -80,
+            child: IgnorePointer(
+              child: Container(
+                width: 280,
+                height: 280,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: primary.withOpacity(isDark ? 0.16 : 0.08),
+                ),
+              ),
+            ),
+          ),
+
+          /// Subscription banner
           if (_subscriptionBanner != null)
             Positioned(
               top: 0,
@@ -218,42 +303,66 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               child: SafeArea(
                 bottom: false,
                 child: MaterialBanner(
-                  backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                  content: Text(
-                    _subscriptionBanner!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onErrorContainer,
-                    ),
-                  ),
+                  backgroundColor: colorScheme.errorContainer,
                   leading: Icon(
                     Icons.warning_amber_rounded,
-                    color: Theme.of(context).colorScheme.onErrorContainer,
+                    color: colorScheme.onErrorContainer,
+                  ),
+                  content: Text(
+                    _subscriptionBanner!,
+                    style: TextStyle(color: colorScheme.onErrorContainer),
                   ),
                   actions: [
                     TextButton(
-                      onPressed: () => setState(() => _subscriptionBanner = null),
+                      onPressed: () {
+                        setState(() {
+                          _subscriptionBanner = null;
+                        });
+                      },
                       child: const Text('Dismiss'),
                     ),
                   ],
                 ),
               ),
             ),
+
+          /// Main content
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isWide ? 40 : 20,
+                  vertical: 24,
+                ),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1100),
+                  constraints: const BoxConstraints(maxWidth: 1150),
                   child: isWide
                       ? Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             const Expanded(flex: 11, child: LoginBrandPanel()),
-                            const SizedBox(width: 20),
+
+                            const SizedBox(width: 48),
+
                             Expanded(flex: 9, child: shell),
                           ],
                         )
-                      : shell,
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            /// Mobile branding
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 28),
+                              child: Icon(
+                                Icons.location_on_rounded,
+                                size: 48,
+                                color: primary,
+                              ),
+                            ),
+
+                            shell,
+                          ],
+                        ),
                 ),
               ),
             ),
