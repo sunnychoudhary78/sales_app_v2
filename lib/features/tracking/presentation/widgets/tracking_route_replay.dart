@@ -9,9 +9,24 @@ import 'tracking_polyline_utils.dart';
 const List<int> replaySpeeds = [1, 4, 16, 32, 64];
 
 const int _stopMinMs = 180000;
+const int gpsTimeGapMs = 5 * 60 * 1000;
 const double _stopPathM = 35;
 const double _stopGpsM = 50;
 const double _pathMNoiseM = 15;
+
+class ConnectorWindow {
+  ConnectorWindow({
+    required this.startMs,
+    required this.endMs,
+    required this.path,
+    required this.cumulativeM,
+  });
+
+  final int startMs;
+  final int endMs;
+  final List<LatLng> path;
+  final List<double> cumulativeM;
+}
 
 class RouteTimeline {
   RouteTimeline({
@@ -21,6 +36,7 @@ class RouteTimeline {
     required this.endMs,
     this.roadPath = const [],
     this.cumulativeRoadM = const [],
+    this.connectorWindows = const [],
   });
 
   final List<RouteTimelinePoint> points;
@@ -29,6 +45,7 @@ class RouteTimeline {
   final int endMs;
   final List<LatLng> roadPath;
   final List<double> cumulativeRoadM;
+  final List<ConnectorWindow> connectorWindows;
 
   bool get canReplay => points.length >= 2 && durationMs > 0;
   bool get hasRoadPath => roadPath.length >= 2 && cumulativeRoadM.length >= 2;
@@ -143,11 +160,70 @@ LatLng? positionAtDistanceAlongRoad(
   return path.last;
 }
 
+List<ConnectorWindow> buildConnectorWindows(
+  List<({LatLng ll, int tMs})> gpsPoints,
+  List<TrackSegment> segments,
+) {
+  if (gpsPoints.length < 2 || segments.isEmpty) return const [];
+  final windows = <ConnectorWindow>[];
+  for (var i = 0; i < segments.length; i++) {
+    final seg = segments[i];
+    if (!seg.isConnector || seg.points.length < 2) continue;
+    final explicitStart = seg.startTime?.millisecondsSinceEpoch;
+    final explicitEnd = seg.endTime?.millisecondsSinceEpoch;
+    if (explicitStart != null && explicitEnd != null && explicitEnd > explicitStart) {
+      windows.add(ConnectorWindow(
+        startMs: explicitStart,
+        endMs: explicitEnd,
+        path: seg.points,
+        cumulativeM: buildCumulativeMeters(seg.points),
+      ));
+      continue;
+    }
+    final prevEnd = i > 0 && segments[i - 1].points.isNotEmpty
+        ? segments[i - 1].points.last
+        : seg.points.first;
+    final nextStart = i < segments.length - 1 && segments[i + 1].points.isNotEmpty
+        ? segments[i + 1].points.first
+        : seg.points.last;
+    var startIdx = 0;
+    var bestStart = double.infinity;
+    for (var g = 0; g < gpsPoints.length; g++) {
+      final d = haversineMeters(gpsPoints[g].ll, prevEnd);
+      if (d < bestStart) {
+        bestStart = d;
+        startIdx = g;
+      }
+    }
+    var endIdx = startIdx;
+    var bestEnd = double.infinity;
+    for (var g = startIdx + 1; g < gpsPoints.length; g++) {
+      final d = haversineMeters(gpsPoints[g].ll, nextStart);
+      if (d < bestEnd) {
+        bestEnd = d;
+        endIdx = g;
+      }
+    }
+    if (endIdx <= startIdx) endIdx = gpsPoints.length - 1;
+    final startMs = gpsPoints[startIdx].tMs;
+    final endMs = gpsPoints[endIdx].tMs;
+    if (endMs <= startMs) continue;
+    windows.add(ConnectorWindow(
+      startMs: startMs,
+      endMs: endMs,
+      path: seg.points,
+      cumulativeM: buildCumulativeMeters(seg.points),
+    ));
+  }
+  return windows;
+}
+
 RouteTimeline? buildRouteTimeline(
   List<Map<String, dynamic>> rawPoints, {
   DateTime? sessionStart,
   DateTime? sessionEnd,
   List<LatLng> roadPath = const [],
+  List<TrackSegment> drawableSegments = const [],
 }) {
   final startBound = sessionStart?.toUtc().millisecondsSinceEpoch;
   final endBound = sessionEnd?.toUtc().millisecondsSinceEpoch;
@@ -191,6 +267,7 @@ RouteTimeline? buildRouteTimeline(
 
   final startMs = points.first.tMs;
   final endMs = points.last.tMs;
+  final connectorWindows = buildConnectorWindows(collapsed, drawableSegments);
   return RouteTimeline(
     points: points,
     durationMs: (endMs - startMs).clamp(0, 1 << 31),
@@ -198,6 +275,7 @@ RouteTimeline? buildRouteTimeline(
     endMs: endMs,
     roadPath: road,
     cumulativeRoadM: road.length >= 2 ? buildCumulativeMeters(road) : const [],
+    connectorWindows: connectorWindows,
   );
 }
 
@@ -224,6 +302,9 @@ double? interpolatePathMByTime(RouteTimeline timeline, int elapsedMs) {
         gpsMoveM < _stopGpsM) {
       return p0;
     }
+    if (gapMs >= gpsTimeGapMs) {
+      return p0;
+    }
 
     final span = math.max(1, gapMs);
     final t = (targetMs - prev.tMs) / span;
@@ -232,10 +313,51 @@ double? interpolatePathMByTime(RouteTimeline timeline, int elapsedMs) {
   return pts.last.pathM;
 }
 
+LatLng _pointAlongPath(List<LatLng> path, List<double> cum, double distanceM) {
+  if (path.length < 2) return path.isEmpty ? const LatLng(0, 0) : path.first;
+  final total = cum.isNotEmpty ? cum.last : 0.0;
+  final d = distanceM.clamp(0.0, total);
+  if (d <= 0) return path.first;
+  if (d >= total) return path.last;
+  for (var i = 1; i < path.length; i++) {
+    if (cum[i] < d) continue;
+    final segLen = cum[i] - cum[i - 1];
+    final ratio = segLen > 0 ? (d - cum[i - 1]) / segLen : 0.0;
+    final a = path[i - 1];
+    final b = path[i];
+    return LatLng(
+      a.latitude + (b.latitude - a.latitude) * ratio,
+      a.longitude + (b.longitude - a.longitude) * ratio,
+    );
+  }
+  return path.last;
+}
+
 LatLng? positionAtTime(RouteTimeline timeline, int elapsedMs) {
   if (!timeline.canReplay) return null;
 
+  final targetMs = timeline.startMs + elapsedMs.clamp(0, timeline.durationMs);
+  for (final window in timeline.connectorWindows) {
+    if (targetMs >= window.startMs && targetMs <= window.endMs && window.path.length >= 2) {
+      final span = math.max(1, window.endMs - window.startMs);
+      final ratio = ((targetMs - window.startMs) / span).clamp(0.0, 1.0);
+      final total = window.cumulativeM.isNotEmpty ? window.cumulativeM.last : 0.0;
+      return _pointAlongPath(window.path, window.cumulativeM, ratio * total);
+    }
+  }
+
   if (timeline.hasRoadPath) {
+    final pts = timeline.points;
+    for (var i = 1; i < pts.length; i++) {
+      final prev = pts[i - 1];
+      final next = pts[i];
+      if (targetMs > next.tMs) continue;
+      final gapMs = next.tMs - prev.tMs;
+      if (gapMs >= gpsTimeGapMs && targetMs > prev.tMs && targetMs < next.tMs) {
+        return prev.latLng;
+      }
+      break;
+    }
     final road = timeline.roadPath;
     final cum = timeline.cumulativeRoadM;
     final pathM = interpolatePathMByTime(timeline, elapsedMs);
@@ -244,7 +366,6 @@ LatLng? positionAtTime(RouteTimeline timeline, int elapsedMs) {
     }
   }
 
-  final targetMs = timeline.startMs + elapsedMs.clamp(0, timeline.durationMs);
   final pts = timeline.points;
 
   if (targetMs <= pts.first.tMs) return pts.first.latLng;

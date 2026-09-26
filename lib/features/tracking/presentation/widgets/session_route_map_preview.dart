@@ -168,11 +168,13 @@ class _SessionRouteMapContentState extends State<_SessionRouteMapContent>
     with SingleTickerProviderStateMixin, RouteReplayTickerMixin {
   final MapController _mapController = MapController();
   List<LatLng> _displayPath = const [];
+  List<TrackSegment> _typedSegments = const [];
   String _displayPathKey = '';
   bool _boundsFitted = false;
   LatLng? _prevReplayPos;
 
   static const Color _routeBlue = Color(0xFF2563EB);
+  static const Color _routeRed = Color(0xFFDC2626);
 
   @override
   void initState() {
@@ -193,6 +195,7 @@ class _SessionRouteMapContentState extends State<_SessionRouteMapContent>
         sessionStart: widget.checkInAt,
         sessionEnd: widget.checkOutAt,
         roadPath: _displayPath,
+        drawableSegments: _typedSegments,
       ),
     );
     _prevReplayPos = null;
@@ -276,7 +279,7 @@ class _SessionRouteMapContentState extends State<_SessionRouteMapContent>
       return LatLng(lat, lon);
     }).whereType<LatLng>().toList();
 
-    final routeSegmentLines = <List<LatLng>>[];
+    final parsedSegments = <TrackSegment>[];
     for (final seg in routeSegmentsRaw) {
       if (seg is! Map) continue;
       final pts = seg['points'];
@@ -288,22 +291,32 @@ class _SessionRouteMapContentState extends State<_SessionRouteMapContent>
         if (lat == null || lon == null) return null;
         return LatLng(lat, lon);
       }).whereType<LatLng>().toList();
-      if (path.length >= 2) routeSegmentLines.add(path);
+      if (path.length < 2) continue;
+      parsedSegments.add(TrackSegment(
+        points: path,
+        type: (seg['type'] ?? 'trace').toString(),
+        provider: seg['provider']?.toString(),
+        startTime: parseSegmentTime(seg['start_time']),
+        endTime: parseSegmentTime(seg['end_time']),
+        seq: seg['seq'] is num ? (seg['seq'] as num).toInt() : null,
+      ));
     }
 
-    final drawableSegments = resolveTrackPolylines(
+    final typedSegments = resolveTypedTrackPolylines(
       pointMapsRaw: mapsForTrack,
-      routeSegmentLines: routeSegmentLines,
+      routeSegments: parsedSegments,
       routeLinePoints: routeLinePoints,
     );
+    final drawableSegments = typedSegments.map((s) => s.points).toList();
 
     final displayPath = mergeDisplayPath(drawableSegments);
     final pathKey = displayPath.isEmpty
         ? ''
-        : '${displayPath.length}:${displayPath.first.latitude},${displayPath.first.longitude}:${displayPath.last.latitude},${displayPath.last.longitude}';
+        : '${displayPath.length}:${typedSegments.length}:${typedSegments.where((s) => s.isConnector).length}:${displayPath.first.latitude},${displayPath.first.longitude}:${displayPath.last.latitude},${displayPath.last.longitude}';
     if (pathKey != _displayPathKey) {
       _displayPathKey = pathKey;
       _displayPath = displayPath;
+      _typedSegments = typedSegments;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _syncReplayTimeline();
       });
@@ -311,33 +324,28 @@ class _SessionRouteMapContentState extends State<_SessionRouteMapContent>
 
     final replayPos = replayPosition;
 
-    final arrowMarkers = buildRouteDirectionArrowMarkers(
-      displayPath,
-      color: _routeBlue,
-    );
+    final arrowMarkers = <Marker>[];
+    for (final seg in typedSegments) {
+      if (seg.points.length < 2) continue;
+      final isConnector = seg.isConnector;
+      final drawPts = isConnector ? offsetPolylineMeters(seg.points) : seg.points;
+      arrowMarkers.addAll(buildRouteDirectionArrowMarkers(
+        drawPts,
+        color: isConnector ? _routeRed : _routeBlue,
+      ));
+    }
 
     final flatForBounds =
         displayPath.isNotEmpty ? displayPath : flattenGpsSegments(drawableSegments);
 
-    LatLng? routeStart;
-    LatLng? routeEnd;
-    trackEndpoints(drawableSegments, onFound: (s, e) {
-      routeStart = s;
-      routeEnd = e;
-    });
-
-    final rawPoints = mapsForTrack
-        .map((p) {
-          final lat = _toDouble(p['latitude']);
-          final lon = _toDouble(p['longitude']);
-          if (lat == null || lon == null) return null;
-          return LatLng(lat, lon);
-        })
-        .whereType<LatLng>()
-        .toList();
-    if (routeStart == null && rawPoints.isNotEmpty) {
-      routeStart = rawPoints.first;
-      routeEnd = rawPoints.last;
+    final gpsEnds = gpsTrackEndpoints(mapsForTrack);
+    LatLng? routeStart = gpsEnds.start;
+    LatLng? routeEnd = gpsEnds.end;
+    if (routeStart == null) {
+      trackEndpoints(drawableSegments, onFound: (s, e) {
+        routeStart = s;
+        routeEnd = e;
+      });
     }
 
     final markers = <Marker>[...arrowMarkers];
@@ -427,7 +435,19 @@ class _SessionRouteMapContentState extends State<_SessionRouteMapContent>
     }
 
     final polylines = <Polyline>[];
-    if (displayPath.length >= 2) {
+    for (final seg in typedSegments) {
+      if (seg.points.length < 2) continue;
+      final isConnector = seg.isConnector;
+      final drawPts = isConnector ? offsetPolylineMeters(seg.points) : seg.points;
+      polylines.add(
+        Polyline(
+          points: drawPts,
+          color: (isConnector ? _routeRed : _routeBlue).withValues(alpha: 0.88),
+          strokeWidth: 5,
+        ),
+      );
+    }
+    if (polylines.isEmpty && displayPath.length >= 2) {
       polylines.add(
         Polyline(
           points: displayPath,

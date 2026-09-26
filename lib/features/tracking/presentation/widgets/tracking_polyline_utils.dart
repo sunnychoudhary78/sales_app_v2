@@ -16,6 +16,119 @@ double haversineMeters(LatLng a, LatLng b) {
   return R * c;
 }
 
+class TrackSegment {
+  const TrackSegment({
+    required this.points,
+    this.type = 'trace',
+    this.provider,
+    this.startTime,
+    this.endTime,
+    this.seq,
+  });
+
+  final List<LatLng> points;
+  final String type;
+  final String? provider;
+  final DateTime? startTime;
+  final DateTime? endTime;
+  final int? seq;
+
+  bool get isConnector => type.toLowerCase() == 'connector';
+}
+
+DateTime? parseSegmentTime(dynamic raw) {
+  if (raw == null) return null;
+  try {
+    return DateTime.parse(raw.toString()).toUtc();
+  } catch (_) {
+    return null;
+  }
+}
+
+({LatLng? start, LatLng? end}) gpsTrackEndpoints(List<Map<String, dynamic>> pointMaps) {
+  final pts = <({LatLng ll, DateTime t})>[];
+  for (final p in pointMaps) {
+    final lat = _toDoubleLoose(p['latitude']);
+    final lon = _toDoubleLoose(p['longitude']);
+    if (lat == null || lon == null) continue;
+    final t = _parseRecordedAt(p['recorded_at']);
+    pts.add((ll: LatLng(lat, lon), t: t ?? DateTime.fromMillisecondsSinceEpoch(0, isUtc: true)));
+  }
+  if (pts.isEmpty) return (start: null, end: null);
+  pts.sort((a, b) => a.t.compareTo(b.t));
+  return (start: pts.first.ll, end: pts.last.ll);
+}
+
+List<LatLng> offsetPolylineMeters(List<LatLng> path, [double meters = 7]) {
+  if (path.length < 2 || meters == 0) return path;
+  double toRad(double v) => v * math.pi / 180.0;
+  double toDeg(double v) => v * 180.0 / math.pi;
+  double bearingRad(LatLng a, LatLng b) {
+    final lat1 = toRad(a.latitude);
+    final lat2 = toRad(b.latitude);
+    final dLon = toRad(b.longitude - a.longitude);
+    final y = math.sin(dLon) * math.cos(lat2);
+    final x = math.cos(lat1) * math.sin(lat2) -
+        math.sin(lat1) * math.cos(lat2) * math.cos(dLon);
+    return math.atan2(y, x);
+  }
+
+  LatLng dest(LatLng origin, double brng, double distM) {
+    final angular = distM / 6371000.0;
+    final lat1 = toRad(origin.latitude);
+    final lon1 = toRad(origin.longitude);
+    final lat2 = math.asin(
+      math.sin(lat1) * math.cos(angular) +
+          math.cos(lat1) * math.sin(angular) * math.cos(brng),
+    );
+    final lon2 = lon1 +
+        math.atan2(
+          math.sin(brng) * math.sin(angular) * math.cos(lat1),
+          math.cos(angular) - math.sin(lat1) * math.sin(lat2),
+        );
+    var lng = toDeg(lon2);
+    lng = ((lng + 540) % 360) - 180;
+    return LatLng(toDeg(lat2), lng);
+  }
+
+  return [
+    for (var i = 0; i < path.length; i++)
+      dest(
+        path[i],
+        bearingRad(
+          i == 0 ? path[i] : path[i - 1],
+          i == path.length - 1 ? path[i] : path[i + 1],
+        ) +
+            math.pi / 2,
+        meters,
+      ),
+  ];
+}
+
+List<TrackSegment> resolveTypedTrackPolylines({
+  required List<dynamic> pointMapsRaw,
+  required List<TrackSegment> routeSegments,
+  required List<LatLng> routeLinePoints,
+}) {
+  final road = routeSegments.where((s) => s.points.length >= 2).toList();
+  if (road.isNotEmpty) {
+    road.sort((a, b) => (a.seq ?? 0).compareTo(b.seq ?? 0));
+    return road;
+  }
+  if (routeLinePoints.length >= 2) {
+    return [TrackSegment(points: List<LatLng>.from(routeLinePoints))];
+  }
+  final lists = resolveTrackPolylines(
+    pointMapsRaw: pointMapsRaw,
+    routeSegmentLines: const [],
+    routeLinePoints: const [],
+  );
+  return [
+    for (final pts in lists)
+      if (pts.length >= 2) TrackSegment(points: pts, type: 'gps'),
+  ];
+}
+
 Color trackingSegmentColor(int index) {
   return HSLColor.fromAHSL(1, (210 + index * 48) % 360, 0.78, 0.48).toColor();
 }
